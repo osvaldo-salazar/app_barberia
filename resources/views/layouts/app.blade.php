@@ -30,7 +30,8 @@
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                     <!-- Left Side Of Navbar -->
                     <ul class="navbar-nav me-auto">
-
+                        <li class="nav-item"><a class="nav-link" href="{{ route('agenda') }}">Agenda</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ route('comisiones') }}">Comisiones</a></li>
                     </ul>
 
                     <!-- Right Side Of Navbar -->
