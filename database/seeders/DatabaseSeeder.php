@@ -2,9 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\{Barber, Service, User};
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,12 +15,20 @@ class DatabaseSeeder extends Seeder
      * Seed the application's database.
      */
     public function run(): void
-    {
-        // User::factory(10)->create();
+{
+    User::create([
+        'name' => 'Admin',
+        'email' => 'tucorreo@ejemplo.com',
+        'password' => Hash::make('cambia_esta_clave'),
+    ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
-    }
+    // Ajusta nombres y porcentajes a tu realidad
+    Barber::create(['name' => 'Tu nombre', 'commission_percent' => 50]);
+    Barber::create(['name' => 'Barbero 2', 'commission_percent' => 50]);
+
+    // Ajusta los precios
+    Service::create(['name' => 'Corte', 'price' => 5000, 'duration_minutes' => 30]);
+    Service::create(['name' => 'Corte + barba', 'price' => 7000, 'duration_minutes' => 60]);
+    Service::create(['name' => 'Barba', 'price' => 3000, 'duration_minutes' => 30]);
+}
 }
