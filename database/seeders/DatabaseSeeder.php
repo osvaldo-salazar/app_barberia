@@ -15,20 +15,44 @@ class DatabaseSeeder extends Seeder
      * Seed the application's database.
      */
     public function run(): void
-{
-    User::create([
-        'name' => 'Admin',
-        'email' => 'tucorreo@ejemplo.com',
-        'password' => Hash::make('cambia_esta_clave'),
-    ]);
+    {
+        User::firstOrCreate(
+            ['email' => config('admin.email')],
+            [
+                'name' => config('admin.name'),
+                'password' => Hash::make(config('admin.password')),
+                'role' => 'admin',
+            ]
+        );
 
-    // Ajusta nombres y porcentajes a tu realidad
-    Barber::create(['name' => 'Tu nombre', 'commission_percent' => 50]);
-    Barber::create(['name' => 'Barbero 2', 'commission_percent' => 50]);
+        // Ajusta nombres y porcentajes a tu realidad
+        Barber::create([
+            'name' => 'Tu nombre',
+            'commission_percent' => 50,
+        ]);
 
-    // Ajusta los precios
-    Service::create(['name' => 'Corte', 'price' => 5000, 'duration_minutes' => 30]);
-    Service::create(['name' => 'Corte + barba', 'price' => 7000, 'duration_minutes' => 60]);
-    Service::create(['name' => 'Barba', 'price' => 3000, 'duration_minutes' => 30]);
-}
+        Barber::create([
+            'name' => 'Barbero 2',
+            'commission_percent' => 50,
+        ]);
+
+        // Ajusta los precios
+        Service::create([
+            'name' => 'Corte',
+            'price' => 5000,
+            'duration_minutes' => 30,
+        ]);
+
+        Service::create([
+            'name' => 'Corte + barba',
+            'price' => 7000,
+            'duration_minutes' => 60,
+        ]);
+
+        Service::create([
+            'name' => 'Barba',
+            'price' => 3000,
+            'duration_minutes' => 30,
+        ]);
+    }
 }
