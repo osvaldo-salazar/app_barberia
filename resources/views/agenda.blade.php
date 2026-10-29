@@ -83,8 +83,23 @@
               </div>
               <div>{{ $a->client_name }} {{ $a->client_last_name }}</div>
               <div class="small text-muted">
-                {{ $a->service->name }} · {{ $a->barber->name }} · ₡{{ number_format($a->price, 0, ',', '.') }}
-              </div>
+                {{ $a->service->name ?? 'Servicio eliminado' }}
+                ·
+                {{ $a->service->name ?? 'Servicio no disponible' }}
+                ·
+                {{ $a->barber?->name ?? 'Barbero eliminado' }}
+                @if($a->barber && $a->barber->trashed())
+                    <span class="text-danger">(Barbero eliminado)</span>
+                @endif
+                · ₡{{ number_format($a->price, 0, ',', '.') }}·
+                ₡{{ number_format($a->price, 0, ',', '.') }}             
+                </div>
+
+              @if($a->payment_method)
+                <div class="small">Pagó con <strong>{{ ucfirst($a->payment_method) }}</strong>
+                  @if($a->tip) · Propina ₡{{ number_format($a->tip, 0, ',', '.') }} @endif
+                </div>
+              @endif
               <div class="small">
                 <a href="https://wa.me/506{{ $a->phone }}?text={{ urlencode('Hola ' . $a->client_name . ', le recordamos su cita en la barbería hoy a las ' . $a->starts_at->format('g:i A')) }}" target="_blank">
                   WhatsApp +506 {{ substr($a->phone, 0, 4) }}-{{ substr($a->phone, 4) }}
@@ -93,14 +108,36 @@
             </div>
 
             @if($a->status === 'pendiente')
-            <div class="d-flex gap-1">
-              @foreach(['completada' => ['Listo', 'success'], 'no_asistio' => ['No vino', 'outline-danger'], 'cancelada' => ['Cancelar', 'outline-secondary']] as $st => [$label, $color])
-                <form method="POST" action="{{ route('citas.estado', $a) }}">
-                  @csrf @method('PATCH')
-                  <input type="hidden" name="status" value="{{ $st }}">
-                  <button class="btn btn-sm btn-{{ $color }}">{{ $label }}</button>
+            <div class="d-flex flex-wrap gap-1">
+              @if($a->status === 'pendiente')
+                <button class="btn btn-sm btn-success btn-listo" type="button"
+                        data-action="{{ route('citas.estado', $a) }}"
+                        data-nombre="{{ $a->client_name }} {{ $a->client_last_name }}"
+                        data-precio="{{ $a->price }}">Listo</button>
+
+                <a href="{{ route('citas.edit', $a) }}" class="btn btn-sm btn-outline-dark">Editar</a>
+
+                @foreach(['no_asistio' => ['No vino', 'outline-danger'], 'cancelada' => ['Cancelar', 'outline-secondary']] as $st => [$label, $color])
+                  <form method="POST" action="{{ route('citas.estado', $a) }}">
+                    @csrf @method('PATCH')
+                    <input type="hidden" name="status" value="{{ $st }}">
+                    <button class="btn btn-sm btn-{{ $color }}">{{ $label }}</button>
+                  </form>
+                @endforeach
+
+                <form method="POST" action="{{ route('citas.destroy', $a) }}"
+                      onsubmit="return confirm('¿Eliminar esta cita?')">
+                  @csrf @method('DELETE')
+                  <button class="btn btn-sm btn-danger">Eliminar</button>
                 </form>
-              @endforeach
+              @else
+                <form method="POST" action="{{ route('citas.estado', $a) }}"
+                      onsubmit="return confirm('¿Reabrir la cita? Se borrará el pago registrado.')">
+                  @csrf @method('PATCH')
+                  <input type="hidden" name="status" value="pendiente">
+                  <button class="btn btn-sm btn-outline-warning">Reabrir</button>
+                </form>
+              @endif
             </div>
             @endif
           </div>
@@ -112,4 +149,52 @@
 
   </div>
 </div>
+
+<div class="modal fade" id="modalPago" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="POST" id="formPago" class="modal-content">
+      @csrf @method('PATCH')
+      <input type="hidden" name="status" value="completada">
+      <div class="modal-header">
+        <h5 class="modal-title">Cobrar</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-1 fw-bold" id="pagoNombre"></p>
+        <p class="text-muted" id="pagoPrecio"></p>
+
+        <label class="form-label">Método de pago</label>
+        <div class="btn-group w-100 mb-3" role="group">
+          <input type="radio" class="btn-check" name="payment_method" id="pm1" value="efectivo" required>
+          <label class="btn btn-outline-dark" for="pm1">Efectivo</label>
+          <input type="radio" class="btn-check" name="payment_method" id="pm2" value="sinpe">
+          <label class="btn btn-outline-dark" for="pm2">SINPE</label>
+          <input type="radio" class="btn-check" name="payment_method" id="pm3" value="tarjeta">
+          <label class="btn btn-outline-dark" for="pm3">Tarjeta</label>
+        </div>
+
+        <label class="form-label">Propina (opcional)</label>
+        <div class="input-group">
+          <span class="input-group-text">₡</span>
+          <input type="number" name="tip" class="form-control" min="0" step="100" inputmode="numeric" value="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-success w-100">Confirmar cobro</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.btn-listo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('formPago').action = btn.dataset.action;
+      document.getElementById('pagoNombre').textContent = btn.dataset.nombre;
+      document.getElementById('pagoPrecio').textContent =
+        'Total: ₡' + Number(btn.dataset.precio).toLocaleString('es-CR');
+      new bootstrap.Modal(document.getElementById('modalPago')).show();
+    });
+  });
+</script>
 @endsection

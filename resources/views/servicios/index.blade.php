@@ -32,6 +32,11 @@
                 <button class="btn btn-sm btn-outline-{{ $s->active ? 'danger' : 'success' }}">
                   {{ $s->active ? 'Desactivar' : 'Activar' }}
                 </button>
+                <form method="POST" action="{{ route('servicios.destroy', $s) }}" class="d-inline"
+                    onsubmit="return confirm('¿Eliminar a {{ $s->name }}? Su historial de citas se conserva.')">
+                @csrf @method('DELETE')
+                <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+              </form>
               </form>
             </td>
           </tr>
