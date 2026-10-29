@@ -40,6 +40,12 @@ class ServiceController extends Controller
         $service->update(['active' => ! $service->active]);
         return back()->with('ok', $service->active ? 'Servicio activado.' : 'Servicio desactivado.');
     }
+    
+        public function destroy(Service $service)
+    {
+        $service->delete();
+        return redirect()->route('servicios.index')->with('ok', 'Servicio eliminado.');
+    }
 
     private function validated(Request $request): array
     {

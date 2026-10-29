@@ -41,6 +41,12 @@ class BarberController extends Controller
         return back()->with('ok', $barber->active ? 'Barbero activado.' : 'Barbero desactivado.');
     }
 
+        public function destroy(Barber $barber)
+    {
+        $barber->delete(); // borrado suave: el historial se conserva
+        return redirect()->route('barberos.index')->with('ok', 'Barbero eliminado.');
+    }
+    
     private function validated(Request $request): array
     {
         return $request->validate([

@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Http\Controllers\AppointmentController;
@@ -10,9 +11,13 @@ use Illuminate\Support\Facades\Route;
 Auth::routes(['register' => false]);
 
 Route::middleware('auth')->group(function () {
-    // Agenda
+
+    // Agenda y citas
     Route::get('/', [AppointmentController::class, 'index'])->name('agenda');
     Route::post('/citas', [AppointmentController::class, 'store'])->name('citas.store');
+    Route::get('/citas/{appointment}/editar', [AppointmentController::class, 'edit'])->name('citas.edit');
+    Route::put('/citas/{appointment}', [AppointmentController::class, 'update'])->name('citas.update');
+    Route::delete('/citas/{appointment}', [AppointmentController::class, 'destroy'])->name('citas.destroy');
     Route::patch('/citas/{appointment}/estado', [AppointmentController::class, 'updateStatus'])->name('citas.estado');
 
     // Comisiones
@@ -21,12 +26,16 @@ Route::middleware('auth')->group(function () {
     // Barberos
     Route::resource('barberos', BarberController::class)
         ->parameters(['barberos' => 'barber'])
-        ->except(['show', 'destroy']);
-    Route::patch('/barberos/{barber}/activo', [BarberController::class, 'toggle'])->name('barberos.toggle');
+        ->except(['show']);
+
+    Route::patch('/barberos/{barber}/activo', [BarberController::class, 'toggle'])
+        ->name('barberos.toggle');
 
     // Servicios
     Route::resource('servicios', ServiceController::class)
         ->parameters(['servicios' => 'service'])
-        ->except(['show', 'destroy']);
-    Route::patch('/servicios/{service}/activo', [ServiceController::class, 'toggle'])->name('servicios.toggle');
+        ->except(['show']);
+
+    Route::patch('/servicios/{service}/activo', [ServiceController::class, 'toggle'])
+        ->name('servicios.toggle');
 });
