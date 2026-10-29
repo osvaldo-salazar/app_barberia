@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#212529">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -32,6 +37,8 @@
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item"><a class="nav-link" href="{{ route('agenda') }}">Agenda</a></li>
                         <li class="nav-item"><a class="nav-link" href="{{ route('comisiones') }}">Comisiones</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ route('barberos.index') }}">Barberos</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ route('servicios.index') }}">Servicios</a></li>  
                     </ul>
 
                     <!-- Right Side Of Navbar -->
@@ -77,5 +84,10 @@
             @yield('content')
         </main>
     </div>
+
+    <script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+</script>
+
 </body>
 </html>
