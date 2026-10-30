@@ -1,153 +1,114 @@
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#212529">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta charset="utf-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="theme-color" content="#121B31">
+  <link rel="manifest" href="/manifest.json">
+  <title>{{ config('app.name', 'Barbería') }}</title>
 
-    <!-- CSRF Token -->
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+  {{-- Aplica el tema antes de pintar para evitar el parpadeo --}}
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('bb-theme');
+        if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-bs-theme', t);
+      } catch (e) {}
+    })();
+  </script>
 
-    <title>{{ config('app.name', 'Laravel') }}</title>
-
-    <!-- Fonts -->
-    <link rel="dns-prefetch" href="//fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=Nunito" rel="stylesheet">
-
-    <!-- Scripts -->
-    @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+  @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 </head>
 <body>
-    <div id="app">
-        <nav class="navbar navbar-expand-md navbar-light bg-white shadow-sm">
-            <div class="container">
+@php
+  $authUser = auth()->user();
+  $links = [];
+  if ($authUser) {
+      $links[] = ['agenda', 'Agenda', 'calendar3', 'agenda'];
+      if (! $authUser->isReception()) {
+          $links[] = ['comisiones', 'Comisiones', 'cash-coin', 'comisiones'];
+      }
+      if ($authUser->isAdmin()) {
+          $links[] = ['barberos.index', 'Barberos', 'person-badge', 'barberos.*'];
+          $links[] = ['servicios.index', 'Servicios', 'tags', 'servicios.*'];
+          $links[] = ['usuarios.index', 'Usuarios', 'people', 'usuarios.*'];
+      }
+  }
+@endphp
 
-                <a class="navbar-brand" href="{{ url('/') }}">
-                    {{ config('app.name', 'Laravel') }}
-                </a>
+<header class="bb-top">
+  <div class="container-xxl bb-top-inner">
+    <a class="bb-brand" href="{{ $authUser ? route('agenda') : url('/') }}">
+      <i class="bi bi-scissors"></i><span>{{ config('app.name', 'Barbería') }}</span>
+    </a>
 
-                <button
-                    class="navbar-toggler"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#navbarSupportedContent"
-                    aria-controls="navbarSupportedContent"
-                    aria-expanded="false"
-                    aria-label="{{ __('Toggle navigation') }}"
-                >
-                    <span class="navbar-toggler-icon"></span>
-                </button>
+    @auth
+      <nav class="bb-nav d-none d-lg-flex">
+        @foreach($links as [$r, $label, $icon, $pattern])
+          <a href="{{ route($r) }}" class="{{ request()->routeIs($pattern) ? 'active' : '' }}">
+            <i class="bi bi-{{ $icon }}"></i>{{ $label }}
+          </a>
+        @endforeach
+      </nav>
+    @endauth
 
-                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <div class="bb-actions">
+      <button type="button" class="bb-iconbtn" id="themeBtn" aria-label="Cambiar entre modo claro y oscuro">
+        <i class="bi bi-moon-stars icon-moon"></i><i class="bi bi-sun icon-sun"></i>
+      </button>
 
-                    <!-- Menú según el rol -->
-                    <ul class="navbar-nav me-auto">
-                        @auth
-                            {{-- Agenda: todos los roles --}}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ route('agenda') }}">
-                                    Agenda
-                                </a>
-                            </li>
-
-                            {{-- Comisiones: admin y barbero --}}
-                            @unless(auth()->user()->isReception())
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ route('comisiones') }}">
-                                        Comisiones
-                                    </a>
-                                </li>
-                            @endunless
-
-                            {{-- Administración: solo admin --}}
-                            @if(auth()->user()->isAdmin())
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ route('barberos.index') }}">
-                                        Barberos
-                                    </a>
-                                </li>
-
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ route('servicios.index') }}">
-                                        Servicios
-                                    </a>
-                                </li>
-
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ route('usuarios.index') }}">
-                                        Usuarios
-                                    </a>
-                                </li>
-                            @endif
-                        @endauth
-                    </ul>
-
-                    <!-- Usuario y cierre de sesión -->
-                    <ul class="navbar-nav ms-auto">
-                        @guest
-                            @if (Route::has('login'))
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ route('login') }}">
-                                        {{ __('Login') }}
-                                    </a>
-                                </li>
-                            @endif
-                        @else
-                            <li class="nav-item dropdown">
-                                <a
-                                    id="navbarDropdown"
-                                    class="nav-link dropdown-toggle"
-                                    href="#"
-                                    role="button"
-                                    data-bs-toggle="dropdown"
-                                    aria-haspopup="true"
-                                    aria-expanded="false"
-                                >
-                                    {{ Auth::user()->name }}
-                                </a>
-
-                                <div
-                                    class="dropdown-menu dropdown-menu-end"
-                                    aria-labelledby="navbarDropdown"
-                                >
-                                    <a
-                                        class="dropdown-item"
-                                        href="{{ route('logout') }}"
-                                        onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
-                                    >
-                                        {{ __('Logout') }}
-                                    </a>
-
-                                    <form
-                                        id="logout-form"
-                                        action="{{ route('logout') }}"
-                                        method="POST"
-                                        class="d-none"
-                                    >
-                                        @csrf
-                                    </form>
-                                </div>
-                            </li>
-                        @endguest
-                    </ul>
-
-                </div>
-            </div>
-        </nav>
-
-        <main class="py-4">
-            @yield('content')
-        </main>
+      @auth
+        <div class="dropdown">
+          <button class="bb-iconbtn" data-bs-toggle="dropdown" aria-label="Mi cuenta"><i class="bi bi-person-circle"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li class="px-3 py-2">
+              <div class="fw-bold">{{ $authUser->name }}</div>
+              <div class="small text-muted text-capitalize">{{ $authUser->role }}</div>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión</button>
+              </form>
+            </li>
+          </ul>
+        </div>
+      @endauth
     </div>
+  </div>
+  <div class="bb-pole"></div>
+</header>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<main class="bb-main">
+  @yield('content')
+</main>
 
-    <!-- Service Worker -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
-        }
-    </script>
+@auth
+  @if(count($links) > 1)
+    <nav class="bb-tabbar d-lg-none">
+      @foreach($links as [$r, $label, $icon, $pattern])
+        <a href="{{ route($r) }}" class="{{ request()->routeIs($pattern) ? 'active' : '' }}">
+          <i class="bi bi-{{ $icon }}"></i><span>{{ $label }}</span>
+        </a>
+      @endforeach
+    </nav>
+  @endif
+@endauth
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('themeBtn')?.addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-bs-theme', next);
+      try { localStorage.setItem('bb-theme', next); } catch (e) {}
+    });
+  });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+</script>
+
+@stack('scripts')
 </body>
 </html>

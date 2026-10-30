@@ -10,93 +10,100 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class AppointmentController extends Controller
-{
-    const OPEN_HOUR = 10;
-    const CLOSE_HOUR = 19;
-
-    public function index(Request $request)
     {
-        $date = $request->filled('fecha')
-            ? Carbon::parse($request->fecha)
-            : today();
+        const OPEN_HOUR = 10;
+        const CLOSE_HOUR = 19;
+
+        public function index(Request $request)
+    {
+        $request->validate(['fecha' => 'nullable|date']);
 
         $user = auth()->user();
+        abort_if($user->isBarber() && ! $user->barber_id, 403, 'Tu usuario no está vinculado a un barbero.');
 
-        abort_if(
-            $user->isBarber() && ! $user->barber_id,
-            403,
-            'Tu usuario no está vinculado a un barbero.'
-        );
+        $date = $request->filled('fecha') ? Carbon::parse($request->fecha) : today();
 
         $appointments = Appointment::with(['barber', 'service'])
             ->whereDate('starts_at', $date)
-            ->when(
-                $user->isBarber(),
-                fn ($q) => $q->where('barber_id', $user->barber_id)
-            )
+            ->when($user->isBarber(), fn ($q) => $q->where('barber_id', $user->barber_id))
             ->orderBy('starts_at')
             ->get();
 
+        // Columnas: barberos activos + los que tengan citas ese día aunque ya estén inactivos o eliminados
+        $columns = Barber::withTrashed()
+            ->where(function ($q) use ($appointments) {
+                $q->where(fn ($w) => $w->whereNull('deleted_at')->where('active', true))
+                ->orWhereIn('id', $appointments->pluck('barber_id'));
+            })
+            ->when($user->isBarber(), fn ($q) => $q->where('id', $user->barber_id))
+            ->orderBy('name')
+            ->get();
+
+        $done = $appointments->where('status', 'completada');
+
+        $stats = [
+            'total'   => $appointments->where('status', '!=', 'cancelada')->count(),
+            'pending' => $appointments->where('status', 'pendiente')->count(),
+            'done'    => $done->count(),
+            'money'   => $user->isBarber()
+                            ? $done->sum('barber_amount') + $done->sum('tip')
+                            : $done->sum('price'),
+        ];
+
         return view('agenda', [
-            'date' => $date,
+            'date'         => $date,
             'appointments' => $appointments,
-
-            'barbers' => Barber::where('active', true)
-                ->when(
-                    $user->isBarber(),
-                    fn ($q) => $q->where('id', $user->barber_id)
-                )
-                ->get(),
-
-            'services' => Service::where('active', true)->get(),
-            'slots' => $this->slots(),
+            'columns'      => $columns,
+            'barbers'      => Barber::where('active', true)
+                                ->when($user->isBarber(), fn ($q) => $q->where('id', $user->barber_id))
+                                ->orderBy('name')->get(),
+            'services'     => Service::where('active', true)->orderBy('name')->get(),
+            'slots'        => $this->slots(),
+            'stats'        => $stats,
         ]);
     }
-
+    
     public function store(Request $request)
     {
-        $f = $this->resolve($request);
+        $data = $this->resolve($request);
 
-        Appointment::create($f + [
+        $appointment = Appointment::create([
+            ...$data,
             'status' => 'pendiente',
+            'barber_amount' => 0,
+            'owner_amount' => 0,
+            'tip' => 0,
         ]);
 
         return redirect()
             ->route('agenda', [
-                'fecha' => $f['starts_at']->toDateString(),
+                'fecha' => $appointment->starts_at->toDateString(),
             ])
-            ->with('ok', 'Cita agendada.');
+            ->with('ok', 'Cita registrada correctamente.');
     }
 
-    public function edit(Appointment $appointment)
+  public function edit(Appointment $appointment)
     {
         $this->own($appointment);
 
-        abort_unless(
-            $appointment->status === 'pendiente',
-            403,
-            'Reabre la cita para editarla.'
-        );
+        $appointment->load(['barber', 'service']);
 
-        $user = auth()->user();
+        $barbers = Barber::where('active', true)
+            ->orderBy('name')
+            ->get();
 
-        return view('citas.edit', [
-            'appointment' => $appointment,
+        $services = Service::where('active', true)
+            ->orderBy('name')
+            ->get();
 
-            'barbers' => Barber::where('active', true)
-                ->when(
-                    $user->isBarber(),
-                    fn ($q) => $q->where('id', $user->barber_id)
-                )
-                ->orWhere('id', $appointment->barber_id)
-                ->get(),
+        $slots = $this->slots();
 
-            'services' => Service::where('active', true)
-                ->orWhere('id', $appointment->service_id)
-                ->get(),
-
-            'slots' => $this->slots(),
-        ]);
+        return view('citas.edit', compact(
+            'appointment',
+            'barbers',
+            'services',
+            'slots'
+        ));
     }
 
     public function update(Request $request, Appointment $appointment)
