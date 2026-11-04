@@ -373,3 +373,6 @@ main.bb-main { padding-block: 1rem calc(var(--tab-h) + .5rem); }
 .stats-row::-webkit-scrollbar { display: none; }
 .stats-row .stat { flex: 1 0 auto; min-width: 7.5rem; padding: .5rem .85rem; }
 .stats-row .stat-n { font-size: 1.25rem; }
+
+/* ============ Gráficos ============ */
+.chart-box { position: relative; height: 260px; }

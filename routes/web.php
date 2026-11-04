@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Http\Controllers\AppointmentController;
@@ -8,6 +9,9 @@ use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\BlockController;
 use App\Http\Controllers\CashController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\WeekController;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +38,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/clientes', [ClientController::class, 'index'])->name('clientes.index');
         Route::get('/clientes/{client}', [ClientController::class, 'show'])->name('clientes.show');
         Route::put('/clientes/{client}', [ClientController::class, 'update'])->name('clientes.update');
+
     });
 
     // Comisiones y bloqueos: admin y barbero
@@ -46,10 +51,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/bloqueos', [BlockController::class, 'index'])->name('bloqueos.index');
         Route::post('/bloqueos', [BlockController::class, 'store'])->name('bloqueos.store');
         Route::delete('/bloqueos/{block}', [BlockController::class, 'destroy'])->name('bloqueos.destroy');
+
     });
 
     // Administración: solo admin
     Route::middleware('role:admin')->group(function () {
+
+        // Dashboard
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
         // Barberos
         Route::resource('barberos', BarberController::class)
@@ -79,8 +88,25 @@ Route::middleware('auth')->group(function () {
         Route::delete('/clientes/{client}', [ClientController::class, 'destroy'])
             ->name('clientes.destroy');
 
-        // Caja
+        // Caja diaria
         Route::get('/caja', [CashController::class, 'show'])->name('caja');
         Route::post('/caja', [CashController::class, 'store'])->name('caja.store');
+        Route::get('/caja/pdf', [CashController::class, 'pdf'])->name('caja.pdf');
+        Route::post('/caja/movimientos', [CashController::class, 'storeEntry'])->name('caja.mov.store');
+        Route::delete('/caja/movimientos/{entry}', [CashController::class, 'destroyEntry'])->name('caja.mov.destroy');
+
+        // Cierre semanal
+        Route::get('/semana', [WeekController::class, 'show'])->name('semana');
+        Route::get('/semana/pdf', [WeekController::class, 'pdf'])->name('semana.pdf');
+        Route::get('/semana/excel', [WeekController::class, 'csv'])->name('semana.csv');
+        Route::post('/semana/pagos', [WeekController::class, 'pay'])->name('semana.pagar');
+        Route::delete('/semana/pagos/{payout}', [WeekController::class, 'unpay'])->name('semana.deshacer');
+
+        // Gastos
+        Route::get('/gastos', [ExpenseController::class, 'index'])->name('gastos.index');
+        Route::post('/gastos', [ExpenseController::class, 'store'])->name('gastos.store');
+        Route::delete('/gastos/{expense}', [ExpenseController::class, 'destroy'])->name('gastos.destroy');
+
     });
-}); 
+
+});
