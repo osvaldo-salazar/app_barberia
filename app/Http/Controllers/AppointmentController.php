@@ -14,8 +14,16 @@ use App\Models\TimeBlock;
 
 class AppointmentController extends Controller
 {
-    const OPEN_HOUR = 10;
-    const CLOSE_HOUR = 19;
+  /** Minutos (desde medianoche) entre los que se puede agendar */
+private function dayBounds(): array
+{
+    return [(int) config('barberia.day_start') * 60, (int) config('barberia.day_end') * 60];
+}
+
+private function hm(int $minutes): string
+{
+    return Carbon::today()->addMinutes($minutes)->format('g:i A');
+}
 
     public function index(Request $request)
 {
@@ -85,28 +93,29 @@ class AppointmentController extends Controller
             : $done->sum('price'),
     ];
 
-    // Bloqueos del día, recortados al horario visible (10:00 a 19:00) y en minutos
+   [$winFrom, $winTo] = $this->dayBounds();
     $dayStart = $date->copy()->startOfDay();
     $dayEnd   = $date->copy()->endOfDay();
 
+    // Bloqueos del día, recortados al rango visible y expresados en minutos
     $blocks = TimeBlock::overlapping($dayStart, $dayEnd)
         ->when($user->isBarber(), fn ($q) => $q->forBarber($user->barber_id))
         ->get()
-        ->map(function ($b) use ($dayStart, $dayEnd) {
+        ->map(function ($b) use ($dayStart, $dayEnd, $winFrom, $winTo) {
             $s = (int) $dayStart->diffInMinutes($b->starts_at->max($dayStart));
             $e = (int) $dayStart->diffInMinutes($b->ends_at->min($dayEnd));
 
             return [
                 'barber_id' => $b->barber_id,
-                'from'      => max(600, $s),
-                'to'        => min(1140, $e),
+                'from'      => max($winFrom, $s),
+                'to'        => min($winTo, $e),
                 'reason'    => $b->reason ?: 'Bloqueado',
             ];
         })
         ->filter(fn ($r) => $r['to'] > $r['from'])
         ->values();
 
-    return view('agenda', [
+         return view('agenda', [
         'date' => $date,
         'appointments' => $appointments,
         'columns' => $columns,
@@ -256,77 +265,93 @@ class AppointmentController extends Controller
     }
 
     /**
-     * Horas de inicio libres, según la duración del servicio.
-     */
-    public function availableSlots(Request $request)
-    {
-        $data = $request->validate([
-            'barber_id' => 'required|exists:barbers,id',
-            'service_id' => 'required|exists:services,id',
-            'date' => 'required|date',
-            'exclude' => 'nullable|integer',
+    /** Horas de inicio libres según la duración del servicio: normales, más temprano y más tarde */
+public function availableSlots(Request $request)
+{
+    $data = $request->validate([
+        'barber_id'  => 'required|exists:barbers,id',
+        'service_id' => 'required|exists:services,id',
+        'date'       => 'required|date',
+        'exclude'    => 'nullable|integer',
+    ]);
+
+    $user = auth()->user();
+    abort_if($user->isBarber() && $data['barber_id'] != $user->barber_id, 403);
+
+    $dur = (int) Service::findOrFail($data['service_id'])->duration_minutes;
+    $day = Carbon::parse($data['date']);
+
+    $dayStart = $day->copy()->startOfDay();
+    $dayEnd   = $day->copy()->endOfDay();
+
+    // Citas del barbero ese día (en minutos desde medianoche)
+    $busy = Appointment::where('barber_id', $data['barber_id'])
+        ->whereIn('status', ['pendiente', 'completada'])
+        ->whereDate('starts_at', $day)
+        ->when($data['exclude'] ?? null, fn ($q, $id) => $q->where('id', '!=', $id))
+        ->get(['starts_at', 'ends_at'])
+        ->map(fn ($a) => [
+            $a->starts_at->hour * 60 + $a->starts_at->minute,
+            $a->ends_at->isSameDay($a->starts_at) ? $a->ends_at->hour * 60 + $a->ends_at->minute : 1440,
         ]);
 
-        $user = auth()->user();
+    // Los bloqueos (del barbero o de toda la barbería) también ocupan tiempo
+    $blocked = TimeBlock::overlapping($dayStart, $dayEnd)
+        ->forBarber($data['barber_id'])
+        ->get()
+        ->map(fn ($b) => [
+            (int) $dayStart->diffInMinutes($b->starts_at->max($dayStart)),
+            (int) $dayStart->diffInMinutes($b->ends_at->min($dayEnd)),
+        ]);
 
-        abort_if(
-            $user->isBarber() && $data['barber_id'] != $user->barber_id,
-            403
-        );
+    $busy = $busy->concat($blocked)->sortBy(0)->values();
 
-        $dur = (int) Service::findOrFail($data['service_id'])->duration_minutes;
-        $day = Carbon::parse($data['date']);
+    [$winFrom, $winTo] = $this->dayBounds();
+    $open  = (int) config('barberia.open_hour') * 60;
+    $close = (int) config('barberia.close_hour') * 60;
 
-        // Citas del barbero ese día (en minutos desde medianoche).
-        $busy = Appointment::where('barber_id', $data['barber_id'])
-            ->whereIn('status', ['pendiente', 'completada'])
-            ->whereDate('starts_at', $day)
-            ->when(
-                $data['exclude'] ?? null,
-                fn ($q, $id) => $q->where('id', '!=', $id)
-            )
-            ->orderBy('starts_at')
-            ->get(['starts_at', 'ends_at'])
-            ->map(fn ($a) => [
-                $a->starts_at->hour * 60 + $a->starts_at->minute,
-                $a->ends_at->hour * 60 + $a->ends_at->minute,
-            ]);
-
-        $open = self::OPEN_HOUR * 60;
-        $close = self::CLOSE_HOUR * 60;
-        $cursor = $open;
-
-        // Hoy: no se ofrecen horas que ya pasaron.
-        // Se redondea al próximo cuarto de hora.
-        if ($day->isToday()) {
-            $now = now();
-
-            $cursor = max(
-                $open,
-                (int) (ceil(($now->hour * 60 + $now->minute) / 15) * 15)
-            );
-        }
-
-        $slots = [];
-
-        $addGap = function (int $from, int $to) use (&$slots, $dur) {
-            for ($t = $from; $t + $dur <= $to; $t += $dur) {
-                $slots[] = sprintf('%02d:%02d', intdiv($t, 60), $t % 60);
-            }
-        };
-
-        foreach ($busy as [$s, $e]) {
-            if ($s > $cursor) {
-                $addGap($cursor, $s);
-            }
-
-            $cursor = max($cursor, $e);
-        }
-
-        $addGap($cursor, $close);
-
-        return response()->json(['slots' => $slots]);
+    // Hoy: no se ofrecen horas que ya pasaron (redondeado al próximo cuarto de hora)
+    $nowMin = 0;
+    if ($day->isToday()) {
+        $n      = now();
+        $nowMin = (int) (ceil(($n->hour * 60 + $n->minute) / 15) * 15);
     }
+
+    $fmt  = fn (int $t) => sprintf('%02d:%02d', intdiv($t, 60), $t % 60);
+    $free = fn (int $t) => $busy->every(fn ($b) => $b[1] <= $t || $b[0] >= $t + $dur);
+
+    // 1) Horario normal: pegado a cada espacio libre, de apertura a cierre
+    $slots  = [];
+    $cursor = max($open, $nowMin);
+
+    foreach ($busy as [$s, $e]) {
+        if ($e <= $cursor) continue;
+        if ($s >= $close)  break;
+
+        for ($t = $cursor; $t + $dur <= min($s, $close); $t += $dur) {
+            $slots[] = $fmt($t);
+        }
+        $cursor = max($cursor, $e);
+    }
+    for ($t = $cursor; $t + $dur <= $close; $t += $dur) {
+        $slots[] = $fmt($t);
+    }
+
+    // 2) Fuera del horario normal: cada 30 minutos, si cabe y está libre
+    $early = [];
+    $late  = [];
+    $first = (int) (ceil(max($winFrom, $nowMin) / 30) * 30);
+
+    for ($t = $first; $t + $dur <= $winTo; $t += 30) {
+        $outside = $t < $open || $t + $dur > $close;
+        if (! $outside || ! $free($t)) continue;
+
+        if ($t < $open) $early[] = $fmt($t);
+        else            $late[]  = $fmt($t);
+    }
+
+    return response()->json(compact('slots', 'early', 'late'));
+}
 
     /**
      * Cantidad de citas por día de un mes (para los puntos del calendario).
@@ -453,12 +478,18 @@ private function resolve(Request $request, ?Appointment $current = null): array
     $start = Carbon::createFromFormat('Y-m-d H:i', $data['date'] . ' ' . $data['time']);
     $end   = $start->copy()->addMinutes($service->duration_minutes);
 
-    // 1) Dentro del horario del local
-    $open  = $start->copy()->setTime(self::OPEN_HOUR, 0);
-    $close = $start->copy()->setTime(self::CLOSE_HOUR, 0);
-    if ($start < $open || $end > $close) {
-        throw ValidationException::withMessages(['time' => 'Ese servicio no cabe dentro del horario (10am - 7pm).']);
-    }
+  // 1) Dentro del rango en que se puede agendar (puede ser fuera del horario normal)
+[$winFrom, $winTo] = $this->dayBounds();
+
+$startMin = $start->hour * 60 + $start->minute;
+$endMin   = $startMin + $service->duration_minutes;
+
+if ($startMin < $winFrom || $endMin > $winTo) {
+    throw ValidationException::withMessages([
+        'time' => 'Ese servicio no cabe en el horario permitido (' .
+            $this->hm($winFrom) . ' a ' . $this->hm($winTo) . ').',
+    ]);
+}
 
     // 2) El barbero no puede tener dos citas a la vez
     $barberBusy = Appointment::where('barber_id', $barber->id)

@@ -1,6 +1,8 @@
 /* ============ Tokens ============ */
 :root {
   --pm: 1.8px;                    /* píxeles por minuto en la agenda */
+  --top-h: calc(3.5rem + 4px + env(safe-area-inset-top, 0px));
+  --tab-h: calc(4rem + env(safe-area-inset-bottom, 0px));
   --bb-red: #C8372D;
   --bb-blue: #3568C9;
   --bb-accent: #3568C9;
@@ -118,8 +120,8 @@ a { color: var(--bb-accent-text); }
 [data-bs-theme="dark"] .icon-sun { display: inline; }
 [data-bs-theme="dark"] .icon-moon { display: none; }
 
-main.bb-main { padding-block: 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
-@media (min-width: 992px) { main.bb-main { padding-bottom: 2rem; } }
+main.bb-main { padding-block: 1rem calc(var(--tab-h) + .5rem); }
+@media (min-width: 992px) { main.bb-main { padding-bottom: 1rem; } }
 
 /* ============ Menú inferior (celular) ============ */
 .bb-tabbar {
@@ -184,13 +186,17 @@ main.bb-main { padding-block: 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px
 
 /* ============ Agenda por columnas ============ */
 .agenda-scroll {
-    overflow: visible;
-    height: auto;
-    max-height: none;
-    overscroll-behavior: auto;
-    background: var(--bb-surface);
-    border: 1px solid var(--bb-line);
-    border-radius: 1rem;
+  overflow: auto;
+  height: calc(100vh - var(--top-h) - var(--tab-h) - .5rem);
+  height: calc(100dvh - var(--top-h) - var(--tab-h) - .5rem);
+  min-height: 22rem;
+  background: var(--bb-surface); border: 1px solid var(--bb-line); border-radius: 1rem;
+}
+@media (min-width: 992px) {
+  .agenda-scroll {
+    height: calc(100vh - var(--top-h) - 1rem);
+    height: calc(100dvh - var(--top-h) - 1rem);
+  }
 }
 
 .agenda-grid {
@@ -215,7 +221,7 @@ main.bb-main { padding-block: 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px
 .agenda-body { position: relative; }
 .agenda-ruler {
   position: sticky; left: 0; z-index: 3;
-  height: calc(540 * var(--pm)); background: var(--bb-surface);
+  height: calc(var(--span) * var(--pm));
   border-right: 1px solid var(--bb-line);
 }
 .agenda-ruler span {
@@ -224,7 +230,7 @@ main.bb-main { padding-block: 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px
 }
 .agenda-col {
   position: relative; cursor: pointer;
-  height: calc(540 * var(--pm));
+  height: calc(var(--span) * var(--pm));
   border-left: 1px solid var(--bb-line-soft);
   background-image:
     linear-gradient(to bottom, var(--bb-line) 1px, transparent 1px),
@@ -354,3 +360,16 @@ main.bb-main { padding-block: 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px
   background: var(--bb-surface); padding: 0 .4rem; border-radius: .4rem;
 }
 
+/* ============ Fuera del horario normal ============ */
+.off-hours {
+  position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none;
+  background: color-mix(in srgb, var(--bs-secondary-color) 9%, transparent);
+}
+.off-hours.before { top: 0; border-bottom: 1px dashed var(--bb-line); }
+.off-hours.after  { bottom: 0; border-top: 1px dashed var(--bb-line); }
+
+/* ============ Resumen compacto ============ */
+.stats-row { display: flex; gap: .5rem; overflow-x: auto; scrollbar-width: none; }
+.stats-row::-webkit-scrollbar { display: none; }
+.stats-row .stat { flex: 1 0 auto; min-width: 7.5rem; padding: .5rem .85rem; }
+.stats-row .stat-n { font-size: 1.25rem; }

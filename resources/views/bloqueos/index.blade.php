@@ -55,15 +55,6 @@
             <input type="date" name="to" class="form-control" value="{{ old('to') }}">
           </div>
 
-          <div class="col-6" data-hours>
-            <label class="form-label small text-muted mb-1">Hora inicial</label>
-            <input type="time" name="start_time" class="form-control" min="10:00" max="18:45" step="900" value="{{ old('start_time') }}">
-          </div>
-          <div class="col-6" data-hours>
-            <label class="form-label small text-muted mb-1">Hora final</label>
-            <input type="time" name="end_time" class="form-control" min="10:15" max="19:00" step="900" value="{{ old('end_time') }}">
-          </div>
-
           <div class="col-12">
             <label class="form-label small text-muted mb-1">Motivo (opcional)</label>
             <input name="reason" class="form-control" maxlength="80" placeholder="Ej: Almuerzo, cita médica, vacaciones" value="{{ old('reason') }}">

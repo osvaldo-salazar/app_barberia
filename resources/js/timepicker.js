@@ -1,14 +1,25 @@
 export function bbTimePicker(form, { url, exclude = null } = {}) {
-  const root   = form.querySelector('[data-timepicker]');
-  const hidden = root.querySelector('input[name="time"]');
-  const grid   = root.querySelector('[data-slots]');
-  const msg    = root.querySelector('[data-slots-msg]');
-  const toggle = root.querySelector('[data-custom-toggle]');
-  const custom = root.querySelector('[data-custom]');
+  const root = form.querySelector('[data-timepicker]');
+  const q = sel => root.querySelector(sel);
+
+  const hidden     = q('input[name="time"]');
+  const grid       = q('[data-slots]');
+  const msg        = q('[data-slots-msg]');
+  const toggle     = q('[data-custom-toggle]');
+  const custom     = q('[data-custom]');
+  const extraWrap  = q('[data-extra-wrap]');
+  const extraBox   = q('[data-extra]');
+  const extraBtn   = q('[data-extra-toggle]');
+  const earlyGrid  = q('[data-early]');
+  const lateGrid   = q('[data-late]');
+  const earlyLabel = q('[data-early-label]');
+  const lateLabel  = q('[data-late-label]');
 
   let ctrl = null;
   let custMode = false;
   let wanted = '';
+  let extraOpen = false;
+  let extraCount = 0;
 
   const label = t => {
     const [h, m] = t.split(':').map(Number);
@@ -16,7 +27,7 @@ export function bbTimePicker(form, { url, exclude = null } = {}) {
   };
 
   function markActive() {
-    grid.querySelectorAll('button').forEach(b =>
+    root.querySelectorAll('.slot-grid button').forEach(b =>
       b.classList.toggle('active', !custMode && b.dataset.t === hidden.value));
   }
 
@@ -33,9 +44,17 @@ export function bbTimePicker(form, { url, exclude = null } = {}) {
     markActive();
   }
 
-  function render(slots) {
-    grid.replaceChildren();
-    slots.forEach(t => {
+  function setExtra(open) {
+    extraOpen = open;
+    extraBox.hidden = !open;
+    extraBtn.querySelector('span').textContent = open
+      ? 'Ocultar horas fuera del horario normal'
+      : 'Fuera del horario normal (' + extraCount + ')';
+  }
+
+  function fill(target, list) {
+    target.replaceChildren();
+    list.forEach(t => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'btn btn-outline-dark btn-sm';
@@ -46,10 +65,26 @@ export function bbTimePicker(form, { url, exclude = null } = {}) {
         hidden.value = t;
         markActive();
       });
-      grid.append(b);
+      target.append(b);
     });
-    msg.textContent = slots.length
-      ? ''
+  }
+
+  function render({ slots, early, late }) {
+    fill(grid, slots);
+    fill(earlyGrid, early);
+    fill(lateGrid, late);
+
+    extraCount = early.length + late.length;
+    earlyLabel.hidden = earlyGrid.hidden = early.length === 0;
+    lateLabel.hidden  = lateGrid.hidden  = late.length === 0;
+    extraWrap.hidden  = extraCount === 0;
+
+    // Si no queda nada en horario normal, se muestran directamente las de fuera de horario
+    setExtra(slots.length === 0 && extraCount > 0);
+
+    if (slots.length) msg.textContent = '';
+    else msg.textContent = extraCount
+      ? 'No quedan horarios dentro del horario normal. Mira los de fuera del horario.'
       : 'No hay horarios libres con esa duración. Prueba otro día o elige otra hora.';
   }
 
@@ -72,16 +107,27 @@ export function bbTimePicker(form, { url, exclude = null } = {}) {
         signal: ctrl.signal,
       });
       if (!r.ok) throw new Error('http');
-      const { slots } = await r.json();
 
-      render(slots);
+      const data = await r.json();
+      render(data);
+
+      const all = [...data.slots, ...data.early, ...data.late];
 
       if (wanted) {
-        if (slots.includes(wanted)) { setCustom(false); hidden.value = wanted; }
-        else setCustom(true, wanted);
+        if (all.includes(wanted)) {
+          setCustom(false);
+          hidden.value = wanted;
+        } else {
+          setCustom(true, wanted);
+        }
         wanted = '';
-      } else if (!custMode && !slots.includes(hidden.value)) {
+      } else if (!custMode && !all.includes(hidden.value)) {
         hidden.value = '';
+      }
+
+      // Si la hora elegida está en "fuera del horario", deja esa sección abierta
+      if (!custMode && hidden.value && !data.slots.includes(hidden.value) && all.includes(hidden.value)) {
+        setExtra(true);
       }
       markActive();
     } catch (e) {
@@ -98,11 +144,15 @@ export function bbTimePicker(form, { url, exclude = null } = {}) {
     custom.value = '';
     hidden.value = '';
     toggle.textContent = 'Elegir otra hora';
-    grid.replaceChildren();
+    [grid, earlyGrid, lateGrid].forEach(g => g.replaceChildren());
+    extraWrap.hidden = true;
+    extraBox.hidden = true;
+    extraOpen = false;
     msg.textContent = '';
   }
 
   toggle.addEventListener('click', () => setCustom(!custMode));
+  extraBtn.addEventListener('click', () => setExtra(!extraOpen));
   custom.addEventListener('input', () => { hidden.value = custom.value; });
 
   return { refresh, setTime, reset };
