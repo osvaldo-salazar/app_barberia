@@ -4,12 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
 class Appointment extends Model
 {
     protected $guarded = [];
@@ -22,9 +16,7 @@ class Appointment extends Model
 
     public function barber()
     {
-        return $this->belongsTo(Barber::class);
         return $this->belongsTo(Barber::class)->withTrashed();
-
     }
 
     public function service()
@@ -32,5 +24,8 @@ class Appointment extends Model
         return $this->belongsTo(Service::class);
     }
 
- 
+    public function client()
+    {
+        return $this->belongsTo(Client::class);
+    }
 }

@@ -23,19 +23,28 @@
 </head>
 <body>
 @php
-  $authUser = auth()->user();
-  $links = [];
-  if ($authUser) {
-      $links[] = ['agenda', 'Agenda', 'calendar3', 'agenda'];
-      if (! $authUser->isReception()) {
-          $links[] = ['comisiones', 'Comisiones', 'cash-coin', 'comisiones'];
-      }
-      if ($authUser->isAdmin()) {
-          $links[] = ['barberos.index', 'Barberos', 'person-badge', 'barberos.*'];
-          $links[] = ['servicios.index', 'Servicios', 'tags', 'servicios.*'];
-          $links[] = ['usuarios.index', 'Usuarios', 'people', 'usuarios.*'];
-      }
-  }
+    $authUser = auth()->user();
+    $links = [];
+
+    if ($authUser) {
+        // Opciones disponibles para todos los usuarios autenticados
+        $links[] = ['agenda', 'Agenda', 'calendar', 'agenda'];
+        $links[] = ['clientes.index', 'Clientes', 'people', 'clientes.*'];
+
+        // Opciones para admin y barbero
+        if (! $authUser->isReception()) {
+            $links[] = ['comisiones', 'Comisiones', 'cash-coin', 'comisiones'];
+            $links[] = ['bloqueos.index', 'Bloqueos', 'calendar-x', 'bloqueos.*'];
+        }
+
+        // Opciones exclusivas del administrador
+        if ($authUser->isAdmin()) {
+            $links[] = ['caja', 'Cierre de caja', 'receipt', 'caja*'];
+            $links[] = ['barberos.index', 'Barberos', 'person-badge', 'barberos.*'];
+            $links[] = ['servicios.index', 'Servicios', 'tags', 'servicios.*'];
+            $links[] = ['usuarios.index', 'Usuarios', 'people', 'usuarios.*'];
+        }
+    }
 @endphp
 
 <header class="bb-top">
@@ -86,17 +95,47 @@
   @yield('content')
 </main>
 
+
 @auth
-  @if(count($links) > 1)
-    <nav class="bb-tabbar d-lg-none">
-      @foreach($links as [$r, $label, $icon, $pattern])
-        <a href="{{ route($r) }}" class="{{ request()->routeIs($pattern) ? 'active' : '' }}">
-          <i class="bi bi-{{ $icon }}"></i><span>{{ $label }}</span>
-        </a>
-      @endforeach
-    </nav>
-  @endif
+    @if(count($links) > 1)
+        @php
+            $primary = array_slice($links, 0, 3);
+            $more = array_slice($links, 3);
+        @endphp
+
+        <nav class="bb-tabbar d-lg-none">
+            @foreach($primary as [$r, $label, $icon, $pattern])
+                <a href="{{ route($r) }}" class="{{ request()->routeIs($pattern) ? 'active' : '' }}">
+                    <i class="bi bi-{{ $icon }}"></i>
+                    <span>{{ $label }}</span>
+                </a>
+            @endforeach
+
+            @if($more)
+                <div class="dropup">
+                    <a href="#" role="button"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false"
+                       class="{{ collect($more)->contains(fn ($l) => request()->routeIs($l[3])) ? 'active' : '' }}">
+                        <i class="bi bi-three-dots"></i>
+                        <span>Más</span>
+                    </a>
+
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        @foreach($more as [$r, $label, $icon, $pattern])
+                            <li>
+                                <a class="dropdown-item" href="{{ route($r) }}">
+                                    <i class="bi bi-{{ $icon }} me-2"></i>{{ $label }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </nav>
+    @endif
 @endauth
+
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {

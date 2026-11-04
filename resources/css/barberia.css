@@ -127,12 +127,36 @@ main.bb-main { padding-block: 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px
   background: var(--bb-surface); border-top: 1px solid var(--bb-line);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.bb-tabbar a {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: .1rem;
-  padding: .5rem 0 .45rem; font-size: .72rem; text-decoration: none; color: var(--bs-secondary-color);
+
+.bb-tabbar > a,
+.bb-tabbar > .dropup > a {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .1rem;
+  padding: .5rem 0 .45rem;
+  font-size: .72rem;
+  text-decoration: none;
+  color: var(--bs-secondary-color);
 }
-.bb-tabbar a i { font-size: 1.25rem; }
-.bb-tabbar a.active { color: var(--bb-accent-text); font-weight: 700; }
+
+.bb-tabbar > .dropup {
+  flex: 1;
+  display: flex;
+}
+
+.bb-tabbar > a i,
+.bb-tabbar > .dropup > a i {
+  font-size: 1.25rem;
+}
+
+.bb-tabbar > a.active,
+.bb-tabbar > .dropup > a.active {
+  color: var(--bb-accent-text);
+  font-weight: 700;
+}
+
 
 .bb-fab {
   position: fixed; right: 1rem; bottom: calc(4.9rem + env(safe-area-inset-bottom, 0px)); z-index: 1020;
@@ -160,10 +184,15 @@ main.bb-main { padding-block: 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px
 
 /* ============ Agenda por columnas ============ */
 .agenda-scroll {
-  overflow: auto; overscroll-behavior: contain;
-  height: clamp(26rem, calc(100dvh - 17rem), 62rem);
-  background: var(--bb-surface); border: 1px solid var(--bb-line); border-radius: 1rem;
+    overflow: visible;
+    height: auto;
+    max-height: none;
+    overscroll-behavior: auto;
+    background: var(--bb-surface);
+    border: 1px solid var(--bb-line);
+    border-radius: 1rem;
 }
+
 .agenda-grid {
   display: grid;
   grid-template-columns: 3.25rem repeat(var(--cols), minmax(10.5rem, 1fr));
@@ -263,3 +292,65 @@ main.bb-main { padding-block: 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px
 
 /* ============ Reducir movimiento ============ */
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ============ Clientes ============ */
+.client-row {
+  display: flex; align-items: center; gap: .8rem;
+  padding: .7rem .9rem; margin-bottom: .45rem;
+  background: var(--bb-surface); border: 1px solid var(--bb-line); border-radius: .9rem;
+  color: var(--bs-body-color); text-decoration: none;
+}
+.client-row:hover { background: var(--bb-surface-2); color: var(--bs-body-color); }
+
+.client-suggest {
+  position: absolute; left: 0; right: 0; top: .25rem; z-index: 20;
+  max-height: 15rem; overflow: auto; box-shadow: 0 10px 28px rgba(0,0,0,.28);
+  --bs-list-group-bg: var(--bb-surface); --bs-list-group-border-color: var(--bb-line);
+  --bs-list-group-color: var(--bs-body-color);
+  --bs-list-group-action-hover-bg: var(--bb-surface-2);
+  --bs-list-group-action-color: var(--bs-body-color);
+}
+.client-add { color: var(--bb-accent-text) !important; font-weight: 600; }
+
+/* ============ Horarios disponibles ============ */
+.slot-grid {
+  display: grid; gap: .4rem; max-height: 11rem; overflow: auto;
+  grid-template-columns: repeat(auto-fill, minmax(5.3rem, 1fr));
+}
+.slot-grid .btn.active { background: var(--bb-accent); border-color: var(--bb-accent); color: #fff; }
+
+/* ============ Calendario ============ */
+.cal-head, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .2rem; text-align: center; }
+.cal-head span { font-size: .75rem; color: var(--bs-secondary-color); padding: .25rem 0; }
+.cal-day {
+  position: relative; display: grid; place-items: center; aspect-ratio: 1 / 1; max-height: 3rem;
+  border-radius: .8rem; font-weight: 600; text-decoration: none; color: var(--bs-body-color);
+}
+.cal-day:hover { background: var(--bb-surface-2); color: var(--bs-body-color); }
+.cal-day.is-today { color: var(--bb-red); }
+.cal-day.is-selected { background: var(--bb-accent); color: #fff; }
+.cal-dot {
+  position: absolute; bottom: .3rem; left: 50%; transform: translateX(-50%);
+  width: .35rem; height: .35rem; border-radius: 50%; background: var(--bb-accent-text);
+}
+.cal-day.is-selected .cal-dot { background: #fff; }
+.cal-legend .cal-dot { position: static; display: inline-block; transform: none; margin-right: .3rem; }
+.client-info {
+  background: var(--bb-surface-2); border-radius: .7rem;
+  padding: .5rem .75rem; font-size: .85rem;
+}
+
+/* ============ Bloqueos en la agenda ============ */
+.appt { z-index: 2; }
+.block-area {
+  position: absolute; left: 0; right: 0; z-index: 1; cursor: not-allowed;
+  display: flex; align-items: flex-start; padding: .25rem .5rem;
+  background: repeating-linear-gradient(-45deg,
+    color-mix(in srgb, var(--bs-secondary-color) 16%, transparent) 0 6px, transparent 6px 12px);
+  border-block: 1px dashed var(--bb-line);
+}
+.block-area span {
+  font-size: .74rem; color: var(--bs-secondary-color);
+  background: var(--bb-surface); padding: 0 .4rem; border-radius: .4rem;
+}
+
