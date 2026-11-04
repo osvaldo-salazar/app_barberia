@@ -9,3 +9,4 @@ import * as bootstrap from 'bootstrap';
 window.bootstrap = bootstrap;
 
 window.bbTimePicker = bbTimePicker;
+window.bbDashboard = () => import('./dashboard.js');
