@@ -1,0 +1,21 @@
+{
+  "Login": "Iniciar sesión",
+  "Email Address": "Correo electrónico",
+  "Password": "Clave",
+  "Remember Me": "Recordarme",
+  "Forgot Your Password?": "¿Olvidaste tu clave?",
+  "Logout": "Cerrar sesión",
+  "Showing": "Mostrando",
+  "to": "a",
+  "of": "de",
+  "results": "resultados",
+  "Pagination Navigation": "Paginación",
+  "Go to page :page": "Ir a la página :page",
+  "Page Expired": "La página expiró. Recarga e inténtalo de nuevo",
+  "Forbidden": "Acceso denegado",
+  "Not Found": "No encontrado",
+  "Unauthorized": "No autorizado",
+  "Server Error": "Error del servidor",
+  "Too Many Requests": "Demasiadas solicitudes",
+  "Service Unavailable": "Servicio no disponible"
+}
