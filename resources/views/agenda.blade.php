@@ -1,11 +1,16 @@
-
 @extends('layouts.app')
 
 @section('content')
 @php
   $user      = auth()->user();
   $money     = ! $user->isReception();
-  $open      = 10 * 60;
+
+  $open      = config('barberia.day_start') * 60;       // minuto en que empieza la agenda
+  $dayTo     = config('barberia.day_end') * 60;
+  $span      = $dayTo - $open;
+  $openMin   = config('barberia.open_hour') * 60;       // horario normal
+  $closeMin  = config('barberia.close_hour') * 60;
+
   $weekStart = $date->copy()->startOfWeek(\Carbon\Carbon::SUNDAY);
   $isToday   = $date->isToday();
   $grid      = $appointments->whereIn('status', ['pendiente', 'completada']);
@@ -19,6 +24,12 @@
     'visits' => (int) $prefill->visits,
     'notes' => $prefill->notes,
   ] : null;
+
+  $mins = fn ($c) => $c->hour * 60 + $c->minute;
+  $outside = $grid->filter(fn ($a) =>
+      $mins($a->starts_at) < $openMin ||
+      ($a->ends_at->isSameDay($a->starts_at) ? $mins($a->ends_at) : 1440) > $closeMin
+  )->sortBy('starts_at');
 @endphp
 
 <div class="container-xxl">
@@ -66,23 +77,32 @@
   @endif
 
   {{-- Resumen del día --}}
-  <div class="row row-cols-2 row-cols-lg-{{ $money ? 4 : 3 }} g-2 mb-3">
-    <div class="col"><div class="stat"><div class="stat-n">{{ $stats['total'] }}</div><div class="stat-l">Citas del día</div></div></div>
-    <div class="col"><div class="stat"><div class="stat-n">{{ $stats['pending'] }}</div><div class="stat-l">Pendientes</div></div></div>
-    <div class="col"><div class="stat"><div class="stat-n">{{ $stats['done'] }}</div><div class="stat-l">Completadas</div></div></div>
+  <div class="stats-row mb-3">
+    <div class="stat"><div class="stat-n">{{ $stats['total'] }}</div><div class="stat-l">Citas del día</div></div>
+    <div class="stat"><div class="stat-n">{{ $stats['pending'] }}</div><div class="stat-l">Pendientes</div></div>
+    <div class="stat"><div class="stat-n">{{ $stats['done'] }}</div><div class="stat-l">Completadas</div></div>
     @if($money)
-      <div class="col"><div class="stat">
+      <div class="stat">
         <div class="stat-n">₡{{ number_format($stats['money'], 0, ',', '.') }}</div>
         <div class="stat-l">{{ $user->isBarber() ? 'Tu ganancia de hoy' : 'Producido hoy' }}</div>
-      </div></div>
+      </div>
     @endif
   </div>
+
+  {{-- Aviso de citas fuera del horario normal --}}
+  @if($outside->isNotEmpty())
+    <button type="button" class="btn btn-sm btn-outline-dark mb-2" id="btnOutside"
+            data-min="{{ $mins($outside->first()->starts_at) }}">
+      <i class="bi bi-moon-stars me-1"></i>
+      {{ $outside->count() }} {{ $outside->count() === 1 ? 'cita fuera' : 'citas fuera' }} del horario normal
+    </button>
+  @endif
 
   {{-- Agenda por columnas --}}
   @if($columns->isEmpty())
     <div class="alert alert-warning">No hay barberos activos. Crea uno en la sección Barberos.</div>
   @else
-    <div class="agenda-scroll" style="--cols: {{ $columns->count() }}">
+    <div class="agenda-scroll" style="--cols: {{ $columns->count() }}; --span: {{ $span }}">
 
       <div class="agenda-grid agenda-head">
         <div class="agenda-corner"></div>
@@ -97,23 +117,32 @@
 
       <div class="agenda-grid agenda-body">
         <div class="agenda-ruler">
-          @for($h = 10; $h < 19; $h++)
-            <span style="top: calc({{ ($h - 10) * 60 }} * var(--pm))">{{ \Carbon\Carbon::createFromTime($h)->format('g A') }}</span>
+          @for($m = $open; $m < $dayTo; $m += 60)
+            <span style="top: calc({{ $m - $open }} * var(--pm))">{{ \Carbon\Carbon::createFromTime(intdiv($m, 60))->format('g A') }}</span>
           @endfor
         </div>
 
         @foreach($columns as $b)
           <div class="agenda-col" data-barber="{{ $b->id }}" title="Toca un espacio libre para agendar">
+
+            @if($openMin > $open)
+              <div class="off-hours before" style="height: calc({{ $openMin - $open }} * var(--pm))"></div>
+            @endif
+            @if($closeMin < $dayTo)
+              <div class="off-hours after" style="top: calc({{ $closeMin - $open }} * var(--pm))"></div>
+            @endif
+
             @foreach($blocks->filter(fn ($x) => $x['barber_id'] === null || $x['barber_id'] == $b->id) as $blk)
-            <div class="block-area" title="{{ $blk['reason'] }}"
-                style="top: calc({{ $blk['from'] - $open }} * var(--pm)); height: calc({{ $blk['to'] - $blk['from'] }} * var(--pm));">
+              <div class="block-area" title="{{ $blk['reason'] }}"
+                   style="top: calc({{ $blk['from'] - $open }} * var(--pm)); height: calc({{ $blk['to'] - $blk['from'] }} * var(--pm));">
                 <span>{{ $blk['reason'] }}</span>
-            </div>
+              </div>
             @endforeach
+
             @foreach($grid->where('barber_id', $b->id) as $a)
               @php
                 $s   = $a->starts_at->hour * 60 + $a->starts_at->minute;
-                $e   = $a->ends_at->hour * 60 + $a->ends_at->minute;
+                $e   = $a->ends_at->isSameDay($a->starts_at) ? $a->ends_at->hour * 60 + $a->ends_at->minute : 1440;
                 $top = $s - $open;
                 $dur = $e - $s;
               @endphp
@@ -392,6 +421,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const pageDate = @json($date->toDateString());
   const todayIso = @json(today()->toDateString());
   const pm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pm'));
+
+  const DAY_FROM = @json($open);       // minuto en que empieza la agenda
+  const SPAN     = @json($span);
+  const OPEN_MIN = @json($openMin);    // hora normal de entrada
+
   const labels = { pendiente: 'Pendiente', completada: 'Completada', cancelada: 'Cancelada', no_asistio: 'No vino' };
 
   /* =============== Detalle de la cita =============== */
@@ -700,7 +734,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.agenda-col').forEach(col => {
     col.addEventListener('click', e => {
       if (e.target !== col) return;
-      const mins = 600 + Math.floor(e.offsetY / pm / 15) * 15;
+      const mins = DAY_FROM + Math.floor(e.offsetY / pm / 15) * 15;
       openNew(col.dataset.barber,
         String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0'));
     });
@@ -791,21 +825,37 @@ document.addEventListener('DOMContentLoaded', () => {
   monthSel.onchange = () => { cm = +monthSel.value; drawCal(); };
   yearSel.onchange  = () => { cy = +yearSel.value;  drawCal(); };
 
-  /* =============== Línea de la hora actual =============== */
+  /* =============== Posición inicial y línea de la hora actual =============== */
   const body = document.querySelector('.agenda-body');
   const scroller = document.querySelector('.agenda-scroll');
-  if (body && isToday) {
-    const line = el('div', 'agenda-now');
-    body.appendChild(line);
-    const place = () => {
-      const n = new Date();
-      const m = n.getHours() * 60 + n.getMinutes() - 600;
-      line.hidden = m < 0 || m > 540;
-      line.style.top = (m * pm) + 'px';
-      return m;
-    };
-    place();
-setInterval(place, 60000);
+
+  if (body && scroller) {
+    let target = (OPEN_MIN - DAY_FROM) * pm - 12;       // empieza en la hora de entrada
+
+    if (isToday) {
+      const line = el('div', 'agenda-now');
+      body.appendChild(line);
+
+      const place = () => {
+        const n = new Date();
+        const m = n.getHours() * 60 + n.getMinutes() - DAY_FROM;
+        line.hidden = m < 0 || m > SPAN;
+        line.style.top = (m * pm) + 'px';
+        return m;
+      };
+
+      const m = place();
+      setInterval(place, 60000);
+      if (m > 0 && m < SPAN) target = m * pm - 140;     // hoy: cerca de la hora actual
+    }
+
+    scroller.scrollTop = Math.max(0, target);
+
+    $('btnOutside')?.addEventListener('click', () => {
+      const min = Number($('btnOutside').dataset.min);
+      scroller.scrollTo({ top: Math.max(0, (min - DAY_FROM) * pm - 24), behavior: 'smooth' });
+    });
+  }
 });
 </script>
 @endpush

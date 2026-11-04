@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class BlockController extends Controller
 {
-    const MAX_DAYS = 62;
+    const MAX_DAYS = 62;    
 
     public function index()
     {
@@ -41,25 +41,23 @@ class BlockController extends Controller
             $request->merge(['barber_id' => $user->barber_id]);
         }
 
-        $data = $request->validate([
-            'barber_id'  => ['nullable', Rule::exists('barbers', 'id')->where(fn ($q) => $q->whereNull('deleted_at')->where('active', 1))],
-            'mode'       => ['required', 'in:day,hours'],
-            'from'       => ['required', 'date_format:Y-m-d'],
-            'to'         => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
-            'start_time' => ['required_if:mode,hours', 'nullable', 'date_format:H:i', 'after_or_equal:10:00'],
-            'end_time'   => ['required_if:mode,hours', 'nullable', 'date_format:H:i', 'after:start_time', 'before_or_equal:19:00'],
-            'reason'     => ['nullable', 'string', 'max:80'],
-        ], [
-            'barber_id.exists'           => 'Ese barbero ya no está disponible.',
-            'mode.required'              => 'Elige si es día completo o por horas.',
-            'from.required'              => 'Elige la fecha inicial.',
-            'to.after_or_equal'          => 'La fecha final no puede ser antes de la inicial.',
-            'start_time.required_if'     => 'Elige la hora inicial.',
-            'start_time.after_or_equal'  => 'La hora inicial no puede ser antes de las 10:00 AM.',
-            'end_time.required_if'       => 'Elige la hora final.',
-            'end_time.after'             => 'La hora final debe ser después de la inicial.',
-            'end_time.before_or_equal'   => 'La hora final no puede pasar de las 7:00 PM.',
-        ]);
+       $data = $request->validate([
+        'barber_id'  => ['nullable', Rule::exists('barbers', 'id')->where(fn ($q) => $q->whereNull('deleted_at')->where('active', 1))],
+        'mode'       => ['required', 'in:day,hours'],
+        'from'       => ['required', 'date_format:Y-m-d'],
+        'to'         => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+        'start_time' => ['required_if:mode,hours', 'nullable', 'date_format:H:i'],
+        'end_time'   => ['required_if:mode,hours', 'nullable', 'date_format:H:i', 'after:start_time'],
+        'reason'     => ['nullable', 'string', 'max:80'],
+    ], [
+        'barber_id.exists'       => 'Ese barbero ya no está disponible.',
+        'mode.required'          => 'Elige si es día completo o por horas.',
+        'from.required'          => 'Elige la fecha inicial.',
+        'to.after_or_equal'      => 'La fecha final no puede ser antes de la inicial.',
+        'start_time.required_if' => 'Elige la hora inicial.',
+        'end_time.required_if'   => 'Elige la hora final.',
+        'end_time.after'         => 'La hora final debe ser después de la inicial.',
+    ]);
 
         $from = Carbon::createFromFormat('Y-m-d', $data['from'])->startOfDay();
         $to   = ! empty($data['to']) ? Carbon::createFromFormat('Y-m-d', $data['to'])->startOfDay() : $from->copy();
