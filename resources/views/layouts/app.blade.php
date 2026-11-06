@@ -31,40 +31,31 @@
 <body>
 
 @php
-    $authUser = auth()->user();
-    $links = [];
-
-    if ($authUser) {
-
-        // Opciones disponibles para todos los usuarios autenticados
-        $links[] = ['agenda', 'Agenda', 'calendar3', 'agenda'];
-        $links[] = ['clientes.index', 'Clientes', 'person-lines-fill', 'clientes.*'];
-
-        // Opciones para admin y barbero
-        if (! $authUser->isReception()) {
-            $links[] = ['comisiones', 'Comisiones', 'cash-coin', 'comisiones'];
-        }
-
-        // Opciones exclusivas del administrador
-        if ($authUser->isAdmin()) {
-            $links[] = ['dashboard', 'Dashboard', 'bar-chart-line', 'dashboard'];
-            $links[] = ['caja', 'Cierre de caja', 'receipt', 'caja*'];
-            $links[] = ['semana', 'Cierre semanal', 'calendar-week', 'semana*'];
-            $links[] = ['gastos.index', 'Gastos', 'wallet2', 'gastos.*'];
-        }
-
-        // Bloqueos: admin y barbero
-        if (! $authUser->isReception()) {
-            $links[] = ['bloqueos.index', 'Bloqueos', 'calendar-x', 'bloqueos.*'];
-        }
-
-        // Administración: solo admin
-        if ($authUser->isAdmin()) {
-            $links[] = ['barberos.index', 'Barberos', 'person-badge', 'barberos.*'];
-            $links[] = ['servicios.index', 'Servicios', 'tags', 'servicios.*'];
-            $links[] = ['usuarios.index', 'Usuarios', 'people', 'usuarios.*'];
-        }
-    }
+  $authUser = auth()->user();
+  $links = [];
+  if ($authUser) {
+      $links[] = ['agenda', 'Agenda', 'calendar3', 'agenda'];
+      $links[] = ['clientes.index', 'Clientes', 'person-lines-fill', 'clientes.*'];
+      if (! $authUser->isReception()) {
+          $links[] = ['comisiones', 'Comisiones', 'cash-coin', 'comisiones'];
+      }
+      $links[] = ['recordatorios.index', 'Recordatorios', 'whatsapp', 'recordatorios.*'];
+      if ($authUser->isAdmin()) {
+          $links[] = ['dashboard', 'Dashboard', 'bar-chart-line', 'dashboard'];
+          $links[] = ['caja', 'Cierre de caja', 'receipt', 'caja*'];
+          $links[] = ['semana', 'Cierre semanal', 'calendar-week', 'semana*'];
+          $links[] = ['gastos.index', 'Gastos', 'wallet2', 'gastos.*'];
+      }
+      if (! $authUser->isReception()) {
+          $links[] = ['bloqueos.index', 'Bloqueos', 'calendar-x', 'bloqueos.*'];
+      }
+      if ($authUser->isAdmin()) {
+          $links[] = ['barberos.index', 'Barberos', 'person-badge', 'barberos.*'];
+          $links[] = ['servicios.index', 'Servicios', 'tags', 'servicios.*'];
+          $links[] = ['usuarios.index', 'Usuarios', 'people', 'usuarios.*'];
+          $links[] = ['actividad', 'Actividad', 'clipboard-data', 'actividad'];
+      }
+  }
 @endphp
 
 <header class="bb-top">

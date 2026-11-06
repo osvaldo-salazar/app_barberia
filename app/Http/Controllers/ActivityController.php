@@ -27,7 +27,7 @@ class ActivityController extends Controller
             ->paginate(40)
             ->withQueryString();
 
-        return view('actividad.index', [
+        return view('actividad.actividad', [
             'logs'  => $logs,
             'users' => User::orderBy('name')->get(['id', 'name']),
         ]);

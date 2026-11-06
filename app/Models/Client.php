@@ -5,14 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\Audited;
 
-
 class Client extends Model
 {
     use Audited;
-    public const NAME_REGEX  = '/^[\pL\pM][\pL\pM\s.\'-]*$/u'; // solo letras, espacios, punto, apóstrofe y guion
-    public const PHONE_REGEX = '/^[2-8]\d{7}$/';                // 8 dígitos de Costa Rica
+
+    public const NAME_REGEX = '/^[\pL\pM][\pL\pM\s.\'-]*$/u';
+    public const PHONE_REGEX = '/^[2-8]\d{7}$/';
 
     protected $guarded = [];
+
+    public function auditEntity(): string
+    {
+        return 'cliente';
+    }
+
+    public function auditName(): string
+    {
+        return $this->full_name;
+    }
 
     public function appointments()
     {
@@ -30,7 +40,7 @@ class Client extends Model
     }
 
     /**
-     * Deja solo los 8 dígitos: quita espacios, guiones y el +506
+     * Deja solo los 8 dígitos: quita espacios, guiones y el +506.
      */
     public static function normalizePhone(?string $phone): string
     {

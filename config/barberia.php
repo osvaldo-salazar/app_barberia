@@ -16,4 +16,7 @@ return [
     'backup_password'      => env('BACKUP_PASSWORD'),
     'mysqldump'            => env('MYSQLDUMP_PATH'),
     'dump_no_tablespaces'  => env('DUMP_NO_TABLESPACES', true),
+
+        // Texto del recordatorio. Variables: :nombre :barberia :dia :hora :barbero
+    'reminder_template' => 'Hola :nombre, le recordamos su cita en :barberia el :dia a las :hora con :barbero. ¡Lo esperamos! Si no puede asistir, avísenos por este medio.',
 ];
