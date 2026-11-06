@@ -1,40 +1,36 @@
-
 <?php
 
-use App\Http\Controllers\AppointmentController;
-use App\Http\Controllers\BarberController;
-use App\Http\Controllers\ClientController;
-use App\Http\Controllers\CommissionController;
-use App\Http\Controllers\ServiceController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\BlockController;
-use App\Http\Controllers\CashController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ExpenseController;
-use App\Http\Controllers\WeekController;
-use App\Http\Controllers\ProofController;
+use App\Http\Controllers\{
+    ActivityController, AppointmentController, BarberController, BlockController, CashController,
+    ClientController, CommissionController, DashboardController, ExpenseController, ProofController,
+    ReminderController, ServiceController, UserController, WeekController};
+use App\Http\Controllers\Auth\PasswordLinkController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ActivityController;
 
-Auth::routes(['register' => false, 'reset' => true]);
+Auth::routes(['register' => false, 'reset' => false]);
+
+// Recuperar la clave con enlace al correo
+Route::middleware('guest')->prefix('clave')->group(function () {
+    Route::get('/olvide', [PasswordLinkController::class, 'request'])->name('password.request');
+    Route::post('/olvide', [PasswordLinkController::class, 'email'])->middleware('throttle:6,10')->name('password.email');
+    Route::get('/restablecer/{token}', [PasswordLinkController::class, 'form'])->name('password.reset');
+    Route::post('/restablecer', [PasswordLinkController::class, 'update'])->middleware('throttle:6,10')->name('password.update');
+});
+
 Route::middleware('auth')->group(function () {
 
-    // Agenda, citas y clientes: admin, barbero y recepción
+    // ===== Admin, barberos y recepción =====
     Route::middleware('role:admin,barbero,recepcion')->group(function () {
-
-        // Agenda
+        // Agenda y citas
         Route::get('/', [AppointmentController::class, 'index'])->name('agenda');
         Route::post('/citas', [AppointmentController::class, 'store'])->name('citas.store');
+        Route::get('/citas/horarios', [AppointmentController::class, 'availableSlots'])->name('citas.horarios');
+        Route::get('/citas/calendario', [AppointmentController::class, 'calendar'])->name('citas.calendario');
         Route::get('/citas/{appointment}/editar', [AppointmentController::class, 'edit'])->name('citas.edit');
         Route::put('/citas/{appointment}', [AppointmentController::class, 'update'])->name('citas.update');
         Route::delete('/citas/{appointment}', [AppointmentController::class, 'destroy'])->name('citas.destroy');
         Route::patch('/citas/{appointment}/estado', [AppointmentController::class, 'updateStatus'])->name('citas.estado');
-        Route::get('/citas/{appointment}/comprobante', [ProofController::class, 'show'])->name('citas.comprobante.show');
-        Route::post('/citas/{appointment}/comprobante', [ProofController::class, 'store'])->name('citas.comprobante.store');
-        Route::delete('/citas/{appointment}/comprobante', [ProofController::class, 'destroy'])->name('citas.comprobante.destroy');
-        Route::get('/citas/horarios', [AppointmentController::class, 'availableSlots'])->name('citas.horarios');
-        Route::get('/citas/calendario', [AppointmentController::class, 'calendar'])->name('citas.calendario');
 
         // Clientes
         Route::get('/clientes/buscar', [ClientController::class, 'search'])->name('clientes.search');
@@ -42,57 +38,29 @@ Route::middleware('auth')->group(function () {
         Route::get('/clientes/{client}', [ClientController::class, 'show'])->name('clientes.show');
         Route::put('/clientes/{client}', [ClientController::class, 'update'])->name('clientes.update');
 
+        // Recordatorios
+        Route::get('/recordatorios', [ReminderController::class, 'index'])->name('recordatorios.index');
+        Route::post('/recordatorios/{appointment}', [ReminderController::class, 'mark'])->name('recordatorios.mark');
+       
     });
 
-    // Comisiones y bloqueos: admin y barbero
+    // ===== Admin y barberos =====
     Route::middleware('role:admin,barbero')->group(function () {
-
-        // Comisiones
         Route::get('/comisiones', [CommissionController::class, 'index'])->name('comisiones');
 
-        // Bloqueos
         Route::get('/bloqueos', [BlockController::class, 'index'])->name('bloqueos.index');
         Route::post('/bloqueos', [BlockController::class, 'store'])->name('bloqueos.store');
         Route::delete('/bloqueos/{block}', [BlockController::class, 'destroy'])->name('bloqueos.destroy');
 
+        Route::get('/citas/{appointment}/comprobante', [ProofController::class, 'show'])->name('citas.comprobante.show');
+        Route::post('/citas/{appointment}/comprobante', [ProofController::class, 'store'])->name('citas.comprobante.store');
+        Route::delete('/citas/{appointment}/comprobante', [ProofController::class, 'destroy'])->name('citas.comprobante.destroy');
     });
 
-    // Administración: solo admin
+    // ===== Solo admin =====
     Route::middleware('role:admin')->group(function () {
-
-        // Actividad
-        Route::get('/actividad', [ActivityController::class, 'index'])->name('actividad');
-
-        // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-        // Barberos
-        Route::resource('barberos', BarberController::class)
-            ->parameters(['barberos' => 'barber'])
-            ->except(['show']);
-
-        Route::patch('/barberos/{barber}/activo', [BarberController::class, 'toggle'])
-            ->name('barberos.toggle');
-
-        // Servicios
-        Route::resource('servicios', ServiceController::class)
-            ->parameters(['servicios' => 'service'])
-            ->except(['show']);
-
-        Route::patch('/servicios/{service}/activo', [ServiceController::class, 'toggle'])
-            ->name('servicios.toggle');
-
-        // Usuarios
-        Route::resource('usuarios', UserController::class)
-            ->parameters(['usuarios' => 'user'])
-            ->except(['show']);
-
-        Route::patch('/usuarios/{user}/activo', [UserController::class, 'toggle'])
-            ->name('usuarios.toggle');
-
-        // Clientes: eliminación solo admin
-        Route::delete('/clientes/{client}', [ClientController::class, 'destroy'])
-            ->name('clientes.destroy');
+        Route::get('/actividad', [ActivityController::class, 'index'])->name('actividad');
 
         // Caja diaria
         Route::get('/caja', [CashController::class, 'show'])->name('caja');
@@ -113,6 +81,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/gastos', [ExpenseController::class, 'store'])->name('gastos.store');
         Route::delete('/gastos/{expense}', [ExpenseController::class, 'destroy'])->name('gastos.destroy');
 
-    });
+        // Eliminar clientes
+        Route::delete('/clientes/{client}', [ClientController::class, 'destroy'])->name('clientes.destroy');
 
+        // Barberos, servicios y usuarios
+        Route::resource('barberos', BarberController::class)->parameters(['barberos' => 'barber'])->except(['show']);
+        Route::patch('/barberos/{barber}/activo', [BarberController::class, 'toggle'])->name('barberos.toggle');
+
+        Route::resource('servicios', ServiceController::class)->parameters(['servicios' => 'service'])->except(['show']);
+        Route::patch('/servicios/{service}/activo', [ServiceController::class, 'toggle'])->name('servicios.toggle');
+
+        Route::resource('usuarios', UserController::class)->parameters(['usuarios' => 'user'])->except(['show']);
+        Route::patch('/usuarios/{user}/activo', [UserController::class, 'toggle'])->name('usuarios.toggle');
+    });
 });

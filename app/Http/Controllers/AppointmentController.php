@@ -132,6 +132,15 @@ if (! $user->isReception()) {
         ->map(fn ($b) => ['name' => $b->name, 'goal' => (int) $b->weekly_goal, 'done' => (int) ($counts[$b->id] ?? 0)]);
 }
 
+// Recordatorios pendientes de mañana
+$tomorrow = Appointment::where('status', 'pendiente')
+    ->whereDate('starts_at', today()->addDay())
+    ->when($user->isBarber(), fn ($q) => $q->where('barber_id', $user->barber_id))
+    ->selectRaw('COUNT(*) as total, SUM(reminded_at IS NULL) as unsent')
+    ->first();
+
+$reminders = ['total' => (int) $tomorrow->total, 'unsent' => (int) $tomorrow->unsent];
+
          return view('agenda', [
         'date' => $date,
         'appointments' => $appointments,
