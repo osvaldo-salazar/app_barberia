@@ -16,3 +16,4 @@ td { padding: 5px 6px; border-bottom: 1px solid #e1e5ee; }
 .final td { font-size: 13px; font-weight: bold; background: #e9eef9; border-top: 2px solid #16213a; }
 .foot { margin-top: 22px; color: #5a6479; font-size: 9px; }
 .sign { height: 26px; }
+tr { page-break-inside: avoid; }

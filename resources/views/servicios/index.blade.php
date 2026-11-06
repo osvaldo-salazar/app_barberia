@@ -68,7 +68,7 @@
                             <form method="POST"
                                   action="{{ route('servicios.destroy', $s) }}"
                                   class="d-inline"
-                                  onsubmit="return confirm('¿Eliminar el servicio {{ $s->name }}? Su historial de citas se conserva.')">
+                                  data-confirm="¿Eliminar el servicio {{ $s->name }}? Su historial de citas se conserva.">
                                 @csrf
                                 @method('DELETE')
 

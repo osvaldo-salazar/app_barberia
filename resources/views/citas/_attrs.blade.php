@@ -17,3 +17,10 @@ data-url-delete="{{ route('citas.destroy', $a) }}"
 data-visits="{{ $a->client?->visits ?? 0 }}"
 data-notes="{{ $a->client?->notes ?? '' }}"
 data-client-url="{{ $a->client ? route('clientes.show', $a->client) : '' }}"
+
+@unless(auth()->user()->isReception())
+data-ref="{{ $a->sinpe_ref }}"
+data-proof-url="{{ $a->proof_path ? route('citas.comprobante.show', $a, false) : '' }}"
+data-proof-store="{{ route('citas.comprobante.store', $a, false) }}"
+data-proof-delete="{{ route('citas.comprobante.destroy', $a, false) }}"
+@endunless

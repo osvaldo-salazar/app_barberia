@@ -52,6 +52,30 @@
     </tbody>
   </table>
 
+  <h2>Detalle por barbero</h2>
+@foreach($d['barbers'] as $b)
+  <table style="margin-bottom:10px; page-break-inside: avoid">
+    <thead>
+      <tr><th colspan="4">{{ $b['name'] }} · {{ $b['cuts'] }} cortes · gana {{ $fmt($b['to_pay']) }} (comisión {{ $fmt($b['commission']) }} + propinas {{ $fmt($b['tips']) }})</th></tr>
+      <tr><th>Día</th><th>Servicios</th><th class="r">Cortes</th><th class="r">Ganó</th></tr>
+    </thead>
+    <tbody>
+      @foreach($b['days'] as $day)
+        <tr>
+          <td>{{ ucfirst($day['date']->translatedFormat('l j')) }}</td>
+          <td>{{ $day['services']->map(fn ($x) => $x['count'] . ' × ' . $x['name'])->implode(', ') }}</td>
+          <td class="r">{{ $day['cuts'] }}</td>
+          <td class="r">{{ $fmt($day['earn']) }}</td>
+        </tr>
+      @endforeach
+      <tr class="tot">
+        <td colspan="2">Total de la semana: {{ $b['services']->map(fn ($x) => $x['count'] . ' × ' . $x['name'])->implode(', ') }}</td>
+        <td class="r">{{ $b['cuts'] }}</td><td class="r">{{ $fmt($b['to_pay']) }}</td>
+      </tr>
+    </tbody>
+  </table>
+@endforeach
+
   <h2>Por día</h2>
   <table>
     <thead><tr><th>Día</th><th class="r">Cortes</th><th class="r">Producido</th><th class="r">Propinas</th></tr></thead>

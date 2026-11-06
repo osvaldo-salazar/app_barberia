@@ -12,12 +12,12 @@ use App\Http\Controllers\CashController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\WeekController;
-
+use App\Http\Controllers\ProofController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ActivityController;
 
-Auth::routes(['register' => false, 'reset' => false]);
-
+Auth::routes(['register' => false, 'reset' => true]);
 Route::middleware('auth')->group(function () {
 
     // Agenda, citas y clientes: admin, barbero y recepción
@@ -30,6 +30,9 @@ Route::middleware('auth')->group(function () {
         Route::put('/citas/{appointment}', [AppointmentController::class, 'update'])->name('citas.update');
         Route::delete('/citas/{appointment}', [AppointmentController::class, 'destroy'])->name('citas.destroy');
         Route::patch('/citas/{appointment}/estado', [AppointmentController::class, 'updateStatus'])->name('citas.estado');
+        Route::get('/citas/{appointment}/comprobante', [ProofController::class, 'show'])->name('citas.comprobante.show');
+        Route::post('/citas/{appointment}/comprobante', [ProofController::class, 'store'])->name('citas.comprobante.store');
+        Route::delete('/citas/{appointment}/comprobante', [ProofController::class, 'destroy'])->name('citas.comprobante.destroy');
         Route::get('/citas/horarios', [AppointmentController::class, 'availableSlots'])->name('citas.horarios');
         Route::get('/citas/calendario', [AppointmentController::class, 'calendar'])->name('citas.calendario');
 
@@ -56,6 +59,9 @@ Route::middleware('auth')->group(function () {
 
     // Administración: solo admin
     Route::middleware('role:admin')->group(function () {
+
+        // Actividad
+        Route::get('/actividad', [ActivityController::class, 'index'])->name('actividad');
 
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

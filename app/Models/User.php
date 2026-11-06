@@ -7,10 +7,14 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Concerns\Audited;
+
 
 
 class User extends Authenticatable
 {
+
+    use Audited;
     use HasFactory, Notifiable;
 
     protected $fillable = [
@@ -33,6 +37,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
 
@@ -55,4 +60,15 @@ class User extends Authenticatable
     {
         return $this->role === 'recepcion';
     }
+
+    public function auditEntity(): string { return 'usuario'; }
+public function auditName(): string { return "{$this->name} ({$this->email})"; }
+public function auditFields(): array
+{
+    return [
+        'name' => ['Nombre', 'text'], 'email' => ['Correo', 'text'], 'role' => ['Rol', 'text'],
+        'barber_id' => ['Barbero vinculado', 'barber'], 'active' => ['Activo', 'bool'],
+        'password' => ['Clave', 'secret'],
+    ];
+}
 }

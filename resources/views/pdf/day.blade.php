@@ -53,18 +53,71 @@
     </tbody>
   </table>
 
-  <h2>Por barbero</h2>
-  <table>
-    <thead><tr><th>Barbero</th><th class="r">Cortes</th><th class="r">Producido</th><th class="r">Gana barbero</th><th class="r">Propinas</th><th class="r">Gana jefe</th></tr></thead>
+  <h2>Por barbero: servicios y ganancia del día</h2>
+@forelse($s['byBarber'] as $b)
+  <table style="margin-bottom:8px">
+    <thead>
+      <tr><th colspan="3">{{ $b['name'] }} · {{ $b['cuts'] }} {{ $b['cuts'] == 1 ? 'corte' : 'cortes' }}</th></tr>
+      <tr><th>Servicio</th><th class="r">Cantidad</th><th class="r">Comisión</th></tr>
+    </thead>
     <tbody>
-      @forelse($s['byBarber'] as $r)
-        <tr><td>{{ $r['name'] }}</td><td class="r">{{ $r['cuts'] }}</td><td class="r">{{ $fmt($r['total']) }}</td>
-            <td class="r">{{ $fmt($r['barber']) }}</td><td class="r">{{ $fmt($r['tips']) }}</td><td class="r">{{ $fmt($r['owner']) }}</td></tr>
-      @empty
-        <tr><td colspan="6" class="muted">Sin servicios cobrados.</td></tr>
-      @endforelse
+      @foreach($b['services'] as $x)
+        <tr><td>{{ $x['name'] }}</td><td class="r">{{ $x['count'] }}</td><td class="r">{{ $fmt($x['commission']) }}</td></tr>
+      @endforeach
+      <tr class="tot">
+        <td colspan="2">Comisión {{ $fmt($b['commission']) }} + propinas {{ $fmt($b['tips']) }}</td>
+        <td class="r">Gana {{ $fmt($b['to_pay']) }}</td>
+      </tr>
     </tbody>
   </table>
+@empty
+  <p class="muted">Sin servicios cobrados.</p>
+@endforelse
+<div class="muted">Parte del jefe: {{ $fmt($s['byBarber']->sum('owner')) }}</div>
+
+
+@if($s['sinpe']->isNotEmpty())
+  @php
+    $proofStore = app(\App\Services\ProofStore::class);
+    $withPhoto  = $s['sinpe']->whereNotNull('proof_path');
+    $shown      = $withPhoto->take(30)->values();
+  @endphp
+  <h2>Comprobantes SINPE ({{ $withPhoto->count() }} de {{ $s['sinpe']->count() }} con foto)</h2>
+  <table>
+    <thead><tr><th>Hora</th><th>Cliente</th><th>Barbero</th><th class="r">Monto</th><th>Referencia</th><th>Foto</th></tr></thead>
+    <tbody>
+      @foreach($s['sinpe'] as $a)
+        <tr>
+          <td>{{ $a->starts_at->format('g:i A') }}</td>
+          <td>{{ $a->client_name }} {{ $a->client_last_name }}</td>
+          <td>{{ $a->barber->name }}</td>
+          <td class="r">{{ $fmt($a->price + $a->tip) }}</td>
+          <td>{{ $a->sinpe_ref ?: '—' }}</td>
+          <td>{{ $a->proof_path ? 'Sí' : 'No' }}</td>
+        </tr>
+      @endforeach
+    </tbody>
+  </table>
+
+  @if($shown->isNotEmpty())
+    <table style="margin-top:8px">
+      <tr>
+        @foreach($shown as $i => $a)
+          @php $uri = $proofStore->thumbDataUri($a->proof_path); @endphp
+          <td style="width:33%; border:1px solid #dde2ec; text-align:center; vertical-align:top; padding:6px">
+            @if($uri)<img src="{{ $uri }}" style="max-width:190px; max-height:230px">@else<span class="muted">Foto no disponible</span>@endif
+            <div class="muted" style="font-size:9px">{{ $a->client_name }} · {{ $fmt($a->price + $a->tip) }}</div>
+          </td>
+          @if(($i + 1) % 3 === 0 && ! $loop->last) </tr><tr> @endif
+        @endforeach
+        @for($k = $shown->count() % 3; $k > 0 && $k < 3; $k++) <td></td> @endfor
+      </tr>
+    </table>
+    @if($withPhoto->count() > 30)
+      <div class="muted">Se muestran 30 fotos; el resto está en el sistema.</div>
+    @endif
+  @endif
+@endif
 
   <h2>Caja de efectivo</h2>
   <table>

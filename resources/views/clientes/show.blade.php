@@ -69,7 +69,7 @@
 
           @if($isAdmin)
             <form method="POST" action="{{ route('clientes.destroy', $client) }}" class="mt-3"
-                  onsubmit="return confirm('¿Eliminar a {{ $client->full_name }}? Se pierden sus notas. Sus citas pasadas se conservan.')">
+                  data-confirm="¿Eliminar a {{ $client->full_name }}? Se pierden sus notas. Sus citas pasadas se conservan.">
               @csrf @method('DELETE')
               <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash3 me-1"></i>Eliminar cliente</button>
             </form>

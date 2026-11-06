@@ -32,20 +32,26 @@ class CommissionController extends Controller
         ->groupBy('payment_method')
         ->pluck('total', 'payment_method');
 
-    return view('comisiones', [
-        'rows'     => $rows,
-        'byMethod' => $byMethod,
-        'start'    => $start,
-        'end'      => $end,
-        'payDay'   => $payDay,
-        'prev'     => $start->copy()->subWeek()->toDateString(),
-        'next'     => $start->copy()->addWeek()->toDateString(),
-        'totals'   => [
-            'total'  => $rows->sum('total'),
-            'barber' => $rows->sum('barber_total'),
-            'owner'  => $rows->sum('owner_total'),
-            'tips'   => $rows->sum('tips'),
-        ],
-    ]);
+        $details = app(\App\Services\BarberBreakdown::class)->forRange($start, $end)
+    ->when($user->isBarber(), fn ($c) => $c->where('id', $user->barber_id)->values());
+
+   return view('comisiones', [
+    'rows'     => $rows,
+    'byMethod' => $byMethod,
+    'details'  => $details,
+    'start'    => $start,
+    'end'      => $end,
+    'payDay'   => $payDay,
+    'prev'     => $start->copy()->subWeek()->toDateString(),
+    'next'     => $start->copy()->addWeek()->toDateString(),
+
+    'totals' => [
+        'total'  => $rows->sum('total'),
+        'barber' => $rows->sum('barber_total'),
+        'owner'  => $rows->sum('owner_total'),
+        'tips'   => $rows->sum('tips'),
+    ],
+]);
+
 }
 }

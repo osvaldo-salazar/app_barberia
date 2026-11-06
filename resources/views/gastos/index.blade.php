@@ -100,7 +100,7 @@
             </div>
           </div>
           <div class="fw-bold">{{ $fmt($e->amount) }}</div>
-          <form method="POST" action="{{ route('gastos.destroy', $e) }}" onsubmit="return confirm('¿Eliminar este gasto?')">
+          <form method="POST" action="{{ route('gastos.destroy', $e) }}" data-confirm="¿Eliminar este gasto?">
             @csrf @method('DELETE')
             <button class="btn btn-sm btn-outline-danger" aria-label="Eliminar gasto"><i class="bi bi-trash3"></i></button>
           </form>

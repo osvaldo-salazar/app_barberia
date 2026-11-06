@@ -149,7 +149,7 @@
               <span class="flex-grow-1 text-truncate">{{ $it['label'] }}</span>
               <strong class="{{ $it['amount'] < 0 ? 'text-danger' : 'text-success' }}">{{ $fmt($it['amount']) }}</strong>
               @if($it['entry_id'])
-                <form method="POST" action="{{ route('caja.mov.destroy', $it['entry_id']) }}" onsubmit="return confirm('¿Eliminar este movimiento?')">
+                <form method="POST" action="{{ route('caja.mov.destroy', $it['entry_id']) }}" data-confirm="¿Eliminar este movimiento?">
                   @csrf @method('DELETE')
                   <button class="btn btn-sm btn-outline-danger" aria-label="Eliminar"><i class="bi bi-trash3"></i></button>
                 </form>
@@ -186,46 +186,93 @@
     </div>
   </div>
 
-  <div class="row g-3 mb-4">
-    <div class="col-lg-5">
-      <h2 class="h6 mb-2">Cortes por servicio</h2>
-      <div class="table-responsive">
-        <table class="table align-middle">
-          <thead class="table-dark"><tr><th>Servicio</th><th class="text-end">Cantidad</th><th class="text-end">Monto</th></tr></thead>
-          <tbody>
-            @forelse($s['byService'] as $r)
-              <tr><td>{{ $r['name'] }}</td><td class="text-end">{{ $r['count'] }}</td><td class="text-end">{{ $fmt($r['amount']) }}</td></tr>
-            @empty
-              <tr><td colspan="3" class="text-center text-muted">Sin servicios cobrados.</td></tr>
-            @endforelse
-          </tbody>
-        </table>
-      </div>
-    </div>
+  @php
+  $sinpe     = $s['sinpe'];
+  $withProof = $sinpe->whereNotNull('proof_path')->count();
+@endphp
 
-    <div class="col-lg-7">
-      <h2 class="h6 mb-2">Por barbero</h2>
-      <div class="table-responsive">
-        <table class="table align-middle">
-          <thead class="table-dark">
-            <tr><th>Barbero</th><th class="text-end">Cortes</th><th class="text-end">Producido</th>
-                <th class="text-end">Gana barbero</th><th class="text-end">Propinas</th><th class="text-end">Gana jefe</th></tr>
-          </thead>
-          <tbody>
-            @forelse($s['byBarber'] as $r)
-              <tr>
-                <td>{{ $r['name'] }}</td><td class="text-end">{{ $r['cuts'] }}</td>
-                <td class="text-end">{{ $fmt($r['total']) }}</td><td class="text-end fw-bold">{{ $fmt($r['barber']) }}</td>
-                <td class="text-end">{{ $fmt($r['tips']) }}</td><td class="text-end">{{ $fmt($r['owner']) }}</td>
-              </tr>
-            @empty
-              <tr><td colspan="6" class="text-center text-muted">Sin servicios cobrados.</td></tr>
-            @endforelse
-          </tbody>
-        </table>
-      </div>
+<div class="row g-3 mb-4">
+  <div class="col-lg-4">
+    <h2 class="h6 mb-2">Cortes por servicio</h2>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead class="table-dark"><tr><th>Servicio</th><th class="text-end">Cantidad</th><th class="text-end">Monto</th></tr></thead>
+        <tbody>
+          @forelse($s['byService'] as $r)
+            <tr><td>{{ $r['name'] }}</td><td class="text-end">{{ $r['count'] }}</td><td class="text-end">{{ $fmt($r['amount']) }}</td></tr>
+          @empty
+            <tr><td colspan="3" class="text-center text-muted">Sin servicios cobrados.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
     </div>
   </div>
+
+  <div class="col-lg-8">
+    <h2 class="h6 mb-2">Por barbero <small class="text-muted fw-normal">(toca el nombre para ver sus servicios)</small></h2>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead class="table-dark">
+          <tr><th>Barbero</th><th class="text-end">Cortes</th><th class="text-end">Comisión</th>
+              <th class="text-end">Propinas</th><th class="text-end">Gana el barbero</th><th class="text-end">Gana jefe</th></tr>
+        </thead>
+        <tbody>
+          @forelse($s['byBarber'] as $b)
+            <tr>
+              <td>
+                <a href="#" class="fw-bold text-decoration-none" data-bs-toggle="modal" data-bs-target="#bd-{{ $b['id'] }}">
+                  {{ $b['name'] }} <i class="bi bi-box-arrow-up-right small"></i>
+                </a>
+                <div class="small text-muted">{{ $b['services']->map(fn ($x) => $x['name'] . ' ×' . $x['count'])->implode(', ') }}</div>
+              </td>
+              <td class="text-end">{{ $b['cuts'] }}</td>
+              <td class="text-end">{{ $fmt($b['commission']) }}</td>
+              <td class="text-end">{{ $fmt($b['tips']) }}</td>
+              <td class="text-end fw-bold">{{ $fmt($b['to_pay']) }}</td>
+              <td class="text-end">{{ $fmt($b['owner']) }}</td>
+            </tr>
+          @empty
+            <tr><td colspan="6" class="text-center text-muted">Sin servicios cobrados.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+@if($sinpe->isNotEmpty())
+  <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+    <h2 class="h6 m-0">Comprobantes SINPE</h2>
+    <span class="small {{ $withProof < $sinpe->count() ? 'text-warning' : 'text-success' }}">
+      {{ $withProof }} de {{ $sinpe->count() }} con comprobante
+    </span>
+  </div>
+  <div class="proof-grid mb-4">
+    @foreach($sinpe as $a)
+      <div class="proof-card">
+        @if($a->proof_path)
+          <a href="#" data-lightbox="{{ route('citas.comprobante.show', $a, false) }}"
+             data-caption="{{ $a->client_name }} {{ $a->client_last_name }} · {{ $fmt($a->price + $a->tip) }}">
+            <img src="{{ route('citas.comprobante.show', $a, false) }}" loading="lazy" alt="Comprobante de {{ $a->client_name }}">
+          </a>
+        @else
+          <div class="proof-missing"><i class="bi bi-image-alt"></i><span>Sin comprobante</span></div>
+        @endif
+        <div class="small fw-bold text-truncate">{{ $a->client_name }} {{ $a->client_last_name }}</div>
+<div class="small text-muted">
+    {{ $a->starts_at->format('g:i A') }}
+    · {{ $a->barber?->name ?? 'Sin barbero' }}
+    · {{ $fmt($a->price + $a->tip) }}
+</div>
+        @if($a->sinpe_ref)<div class="small text-muted">Ref. {{ $a->sinpe_ref }}</div>@endif
+      </div>
+    @endforeach
+  </div>
+@endif
+
+@foreach($s['byBarber'] as $b)
+  @include('partials.barber-modal', ['b' => $b, 'subtitle' => ucfirst($date->translatedFormat('l j \d\e F'))])
+@endforeach
 
   <h2 class="h6 mb-2">Historial de caja (últimos cierres)</h2>
   <div class="table-responsive">

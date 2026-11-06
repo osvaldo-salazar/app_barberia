@@ -50,6 +50,18 @@
     </div>
   @endif
 
+ @php
+    $sinpe = $d['sinpe'] ?? collect();
+    $missing = $sinpe->whereNull('proof_path')->count();
+@endphp
+
+@if($sinpe->isNotEmpty())
+  <div class="alert {{ $missing ? 'alert-warning' : 'alert-info' }} py-2">
+    <i class="bi bi-image me-1"></i>SINPE de la semana: {{ $sinpe->count() - $missing }} de {{ $sinpe->count() }} con comprobante.
+    @if($missing) Revísalos día por día en el <a href="{{ route('caja') }}">cierre de caja</a>. @endif
+  </div>
+@endif
+
   <div class="row row-cols-2 row-cols-lg-5 g-2 mb-3">
     <div class="col"><div class="stat"><div class="stat-n">{{ $d['totals']['cuts'] }}</div><div class="stat-l">Cortes</div></div></div>
     <div class="col"><div class="stat"><div class="stat-n fs-5">{{ $fmt($d['totals']['total']) }}</div><div class="stat-l">Producido</div></div></div>
@@ -82,8 +94,12 @@
         @forelse($d['barbers'] as $b)
           @php $p = $b['payout']; @endphp
           <tr>
-            <td>{{ $b['name'] }}</td>
-            <td class="text-end">{{ $b['cuts'] }}</td>
+            <td>
+              <a href="#" class="fw-bold text-decoration-none" data-bs-toggle="modal" data-bs-target="#bd-{{ $b['id'] }}">
+                {{ $b['name'] }} <i class="bi bi-box-arrow-up-right small"></i>
+              </a>
+              <div class="small text-muted">{{ $b['services']->map(fn ($x) => $x['name'] . ' ×' . $x['count'])->implode(', ') }}</div>
+            </td>            <td class="text-end">{{ $b['cuts'] }}</td>
             <td class="text-end">{{ $fmt($b['total']) }}</td>
             <td class="text-end">{{ $fmt($b['commission']) }}</td>
             <td class="text-end">{{ $fmt($b['tips']) }}</td>
@@ -93,7 +109,7 @@
                 <span class="badge st-completada">Pagado</span>
                 <span class="small">{{ $p->method === 'sinpe' ? 'SINPE' : 'Efectivo' }} · {{ $p->paid_on->format('d/m') }} · {{ $fmt($p->amount) }}</span>
                 <form method="POST" action="{{ route('semana.deshacer', $p) }}" class="d-inline"
-                      onsubmit="return confirm('¿Deshacer este pago? Si fue en efectivo, vuelve a la caja.')">
+                      data-confirm="¿Deshacer este pago? Si fue en efectivo, vuelve a la caja.">
                   @csrf @method('DELETE')
                   <button class="btn btn-sm btn-link text-danger p-0 ms-1">Deshacer</button>
                 </form>
@@ -102,7 +118,7 @@
                 @endif
               @else
                 <form method="POST" action="{{ route('semana.pagar') }}" class="d-flex gap-1"
-                      onsubmit="return confirm('¿Marcar pagado {{ $fmt($b['to_pay']) }} a {{ $b['name'] }}?')">
+                      data-confirm="¿Marcar pagado {{ $fmt($b['to_pay']) }} a {{ $b['name'] }}?">
                   @csrf
                   <input type="hidden" name="week" value="{{ $d['start']->toDateString() }}">
                   <input type="hidden" name="barber_id" value="{{ $b['id'] }}">
@@ -168,4 +184,9 @@
     </div>
   </div>
 </div>
+
+@foreach($d['barbers'] as $b)
+  @include('partials.barber-modal', ['b' => $b, 'subtitle' => 'Semana del ' . $d['start']->format('d/m') . ' al ' . $d['end']->format('d/m/Y')])
+@endforeach
+
 @endsection
