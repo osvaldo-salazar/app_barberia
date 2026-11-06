@@ -291,6 +291,45 @@
     }
 </script>
 
+<div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+{{-- Confirmación --}}
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content text-center p-3">
+      <div class="confirm-icon is-info" id="confirmIcon"><i class="bi bi-question-circle-fill"></i></div>
+      <h2 class="h5 mt-2" id="confirmTitle"></h2>
+      <p class="text-muted mb-3" id="confirmText"></p>
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-dark" id="confirmOk"></button>
+        <button type="button" class="btn btn-outline-dark" id="confirmCancel" data-bs-dismiss="modal"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{-- Visor de fotos --}}
+<div class="modal fade" id="lightbox" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
+    <div class="modal-content bg-transparent border-0">
+      <div class="d-flex justify-content-between align-items-center text-white p-2">
+        <span id="lightboxCaption" class="small"></span>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <img id="lightboxImg" class="img-fluid rounded" alt="Comprobante">
+    </div>
+  </div>
+</div>
+
+@if(session('warn') || session('info'))
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      @if(session('warn')) bbUi.toast(@json(session('warn')), 'warning', 'Ojo'); @endif
+      @if(session('info')) bbUi.toast(@json(session('info')), 'info'); @endif
+    });
+  </script>
+@endif
+
 @stack('scripts')
 
 </body>

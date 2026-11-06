@@ -1,3 +1,4 @@
+
 @extends('layouts.app')
 
 @section('content')
@@ -13,7 +14,15 @@
   <div class="table-responsive">
     <table class="table table-striped align-middle">
       <thead class="table-dark">
-        <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Barbero</th><th>Estado</th><th></th></tr>
+        <tr>
+          <th>Nombre</th>
+          <th>Correo</th>
+          <th>Rol</th>
+          <th>Barbero</th>
+          <th>Estado</th>
+          <th>Último acceso</th>
+          <th></th>
+        </tr>
       </thead>
       <tbody>
         @foreach($users as $u)
@@ -25,6 +34,9 @@
             <td>
               <span class="badge bg-{{ $u->active ? 'success' : 'secondary' }}">{{ $u->active ? 'Activo' : 'Inactivo' }}</span>
             </td>
+            <td class="small text-muted">
+              {{ $u->last_login_at?->diffForHumans() ?? 'Nunca' }}
+            </td>
             <td class="text-end text-nowrap">
               <a href="{{ route('usuarios.edit', $u) }}" class="btn btn-sm btn-outline-dark">Editar</a>
               @if($u->id !== auth()->id())
@@ -35,7 +47,7 @@
                   </button>
                 </form>
                 <form method="POST" action="{{ route('usuarios.destroy', $u) }}" class="d-inline"
-                      onsubmit="return confirm('¿Eliminar a {{ $u->name }}?')">
+                      data-confirm="¿Eliminar a {{ $u->name }}?">
                   @csrf @method('DELETE')
                   <button class="btn btn-sm btn-outline-danger">Eliminar</button>
                 </form>

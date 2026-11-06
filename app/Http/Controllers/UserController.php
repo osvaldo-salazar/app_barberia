@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\{Barber, User};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
@@ -77,15 +78,16 @@ class UserController extends Controller
         return redirect()->route('usuarios.index')->with('ok', 'Usuario eliminado.');
     }
 
-    private function validated(Request $request, ?User $user = null): array
+    private function validated(Request $request, ?User $user = null): array 
     {
         $data = $request->validate([
             'name'      => 'required|string|max:60',
             'email'     => ['required', 'email', 'max:120', Rule::unique('users', 'email')->ignore($user?->id)],
             'role'      => ['required', Rule::in(['admin', 'barbero', 'recepcion'])],
             'barber_id' => ['nullable', 'required_if:role,barbero', 'exists:barbers,id'],
-            'password'  => [$user ? 'nullable' : 'required', 'string', 'min:8'],
-        ], [
+            'password' => [    $user ? 'nullable' : 'required',Password::min(8)->letters()->numbers()],],
+
+        [
             'barber_id.required_if' => 'Elige a qué barbero corresponde este usuario.',
             'password.min'          => 'La clave debe tener al menos 8 caracteres.',
         ]);

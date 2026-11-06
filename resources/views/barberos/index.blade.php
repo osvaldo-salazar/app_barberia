@@ -64,7 +64,7 @@
                               <form method="POST"
                                     action="{{ route('barberos.destroy', ['barber' => $b->id]) }}"
                                     class="d-inline"
-                                    onsubmit="return confirm('¿Seguro que deseas eliminar este barbero?')">
+                                    data-confirm="¿Seguro que deseas eliminar este barbero?">
                                   @csrf
                                   @method('DELETE')
 

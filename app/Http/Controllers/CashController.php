@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{CashClosing, CashEntry};
+use App\Models\ActivityLog;
 use App\Services\CashBook;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -66,6 +67,7 @@ class CashController extends Controller
         $date = $this->date($request);
         $f    = $this->figures($date);
         $f['date'] = $date;
+        ActivityLog::note('Descargó el PDF de caja del ' . $date->format('d/m/Y'), 'export');
 
         return Pdf::loadView('pdf.day', $f)->setPaper('a4')
             ->download('caja-' . $date->toDateString() . '.pdf');

@@ -5,7 +5,7 @@ import '@fontsource-variable/dm-sans';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { bbTimePicker } from './timepicker';
 import * as bootstrap from 'bootstrap';
-
+import './ui';
 window.bootstrap = bootstrap;
 
 window.bbTimePicker = bbTimePicker;

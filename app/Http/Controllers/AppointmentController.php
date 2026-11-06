@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use App\Models\TimeBlock;
+use App\Services\ProofStore;
 
 class AppointmentController extends Controller
 {
@@ -115,10 +116,27 @@ private function hm(int $minutes): string
         ->filter(fn ($r) => $r['to'] > $r['from'])
         ->values();
 
+        // Metas de la semana actual (domingo a sábado). La recepción no las ve.
+$goals = collect();
+if (! $user->isReception()) {
+    $wStart = today()->startOfWeek(Carbon::SUNDAY);
+    $wEnd   = $wStart->copy()->addDays(6)->endOfDay();
+
+    $counts = Appointment::where('status', 'completada')
+        ->whereBetween('starts_at', [$wStart, $wEnd])
+        ->selectRaw('barber_id, COUNT(*) as c')->groupBy('barber_id')->pluck('c', 'barber_id');
+
+    $goals = Barber::where('active', true)->whereNotNull('weekly_goal')
+        ->when($user->isBarber(), fn ($q) => $q->where('id', $user->barber_id))
+        ->orderBy('name')->get()
+        ->map(fn ($b) => ['name' => $b->name, 'goal' => (int) $b->weekly_goal, 'done' => (int) ($counts[$b->id] ?? 0)]);
+}
+
          return view('agenda', [
         'date' => $date,
         'appointments' => $appointments,
         'columns' => $columns,
+        'goals' => $goals,
         'prefill' => $prefill,
 
         'barbers' => Barber::where('active', true)
@@ -139,23 +157,32 @@ private function hm(int $minutes): string
 }
 
     public function store(Request $request)
-    {
-        $data = $this->resolve($request);
+{
+    $data = $this->resolve($request);
 
-        $appointment = Appointment::create([
-            ...$data,
-            'status' => 'pendiente',
-            'barber_amount' => 0,
-            'owner_amount' => 0,
-            'tip' => 0,
-        ]);
+    $appointment = Appointment::create([
+        ...$data,
+        'status' => 'pendiente',
+        'barber_amount' => 0,
+        'owner_amount' => 0,
+        'tip' => 0,
+    ]);
 
-        return redirect()
-            ->route('agenda', [
-                'fecha' => $appointment->starts_at->toDateString(),
-            ])
-            ->with('ok', 'Cita registrada correctamente.');
-    }
+    $barber = Barber::findOrFail($data['barber_id']);
+
+    return redirect()
+        ->route('agenda', [
+            'fecha' => $appointment->starts_at->toDateString(),
+        ])
+        ->with(
+            'ok',
+            "Cita agendada: {$data['client_name']} {$data['client_last_name']} · "
+            . $data['starts_at']->translatedFormat('D j M')
+            . ' a las '
+            . $data['starts_at']->format('g:i A')
+            . " con {$barber->name}."
+        );
+}
 
     public function edit(Appointment $appointment)
     {
@@ -179,93 +206,143 @@ private function hm(int $minutes): string
     }
 
     public function update(Request $request, Appointment $appointment)
-    {
-        $this->own($appointment);
+{
+    $this->own($appointment);
 
-        abort_unless(
-            $appointment->status === 'pendiente',
-            403,
-            'Reabre la cita para editarla.'
+    abort_unless(
+        $appointment->status === 'pendiente',
+        403,
+        'Reabre la cita para editarla.'
+    );
+
+    $f = $this->resolve($request, $appointment);
+
+    $appointment->update($f);
+
+    return redirect()
+        ->route('agenda', [
+            'fecha' => $f['starts_at']->toDateString(),
+        ])
+        ->with(
+            'ok',
+            "Cita de {$appointment->client_name} {$appointment->client_last_name} actualizada: "
+            . $f['starts_at']->translatedFormat('D j M')
+            . ' a las '
+            . $f['starts_at']->format('g:i A')
+            . '.'
         );
-
-        $f = $this->resolve($request, $appointment);
-
-        $appointment->update($f);
-
-        return redirect()
-            ->route('agenda', [
-                'fecha' => $f['starts_at']->toDateString(),
-            ])
-            ->with('ok', 'Cita actualizada.');
-    }
+}
 
     public function destroy(Appointment $appointment)
-    {
-        $this->own($appointment);
+{
+    $this->own($appointment);
 
-        abort_unless(
-            $appointment->status === 'pendiente',
-            403,
-            'Reabre la cita para eliminarla.'
-        );
+    abort_unless(
+        $appointment->status === 'pendiente',
+        403,
+        'Reabre la cita para eliminarla.'
+    );
 
-        $date = $appointment->starts_at->toDateString();
+    $date = $appointment->starts_at->toDateString();
 
-        $appointment->delete();
+    $name = "{$appointment->client_name} {$appointment->client_last_name}";
 
-        return redirect()
-            ->route('agenda', ['fecha' => $date])
-            ->with('ok', 'Cita eliminada.');
-    }
+    $appointment->delete();
 
-    public function updateStatus(Request $request, Appointment $appointment)
-    {
-        $this->own($appointment);
+    return redirect()
+        ->route('agenda', ['fecha' => $date])
+        ->with('ok', "La cita de {$name} fue eliminada.");
+}
 
-        $data = $request->validate([
-            'status' => 'required|in:pendiente,completada,cancelada,no_asistio',
-            'payment_method' => 'required_if:status,completada|nullable|in:efectivo,sinpe,tarjeta',
-            'tip' => 'nullable|integer|min:0|max:1000000',
-        ], [
-            'payment_method.required_if' => 'Elige el método de pago.',
-        ]);
+    public function updateStatus(Request $request, Appointment $appointment, ProofStore $proofs)
+{
+    $this->own($appointment);
 
-        abort_if(
-            auth()->user()->isReception()
-                && (
-                    $data['status'] === 'completada'
-                    || $appointment->status === 'completada'
-                ),
-            403,
-            'La recepción no puede cobrar ni reabrir citas.'
-        );
+    $data = $request->validate([
+        'status'         => 'required|in:pendiente,completada,cancelada,no_asistio',
+        'payment_method' => 'required_if:status,completada|nullable|in:efectivo,sinpe,tarjeta',
+        'tip'            => 'nullable|integer|min:0|max:1000000',
+        'sinpe_ref'      => ['nullable', 'string', 'max:30', 'regex:/^[A-Za-z0-9\- ]+$/'],
+        'proof'          => [
+            Rule::requiredIf(fn () => config('barberia.require_sinpe_proof')
+                && $request->status === 'completada' && $request->payment_method === 'sinpe'),
+            'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:6144',
+        ],
+    ], [
+        'payment_method.required_if' => 'Elige el método de pago.',
+        'proof.required'  => 'Adjunta la foto del comprobante SINPE.',
+        'proof.image'     => 'El comprobante debe ser una imagen.',
+        'proof.mimes'     => 'El comprobante debe ser JPG, PNG o WEBP.',
+        'proof.max'       => 'La foto pesa demasiado (máximo 6 MB).',
+        'proof.uploaded'  => 'No se pudo subir la foto. Revisa tu conexión e inténtalo de nuevo.',
+        'sinpe_ref.regex' => 'La referencia solo puede tener letras, números y guiones.',
+    ]);
 
-        if ($data['status'] === 'completada') {
-            $barberAmount = (int) round(
-                $appointment->price * $appointment->commission_percent / 100
-            );
+    abort_if(
+        auth()->user()->isReception() && ($data['status'] === 'completada' || $appointment->status === 'completada'),
+        403,
+        'La recepción no puede cobrar ni reabrir citas.'
+    );
 
-            $appointment->barber_amount = $barberAmount;
-            $appointment->owner_amount = $appointment->price - $barberAmount;
-            $appointment->payment_method = $data['payment_method'];
-            $appointment->tip = (int) ($data['tip'] ?? 0);
-            $appointment->completed_at = now();
+    if ($data['status'] === 'completada') {
+        $barberAmount = (int) round($appointment->price * $appointment->commission_percent / 100);
+        $appointment->barber_amount  = $barberAmount;
+        $appointment->owner_amount   = $appointment->price - $barberAmount;
+        $appointment->payment_method = $data['payment_method'];
+        $appointment->tip            = (int) ($data['tip'] ?? 0);
+        $appointment->completed_at   = now();
+
+        if ($data['payment_method'] === 'sinpe') {
+            if ($request->hasFile('proof')) {
+                $proofs->delete($appointment->proof_path);
+                $appointment->proof_path = $proofs->store($request->file('proof'), $appointment);
+            }
+            $appointment->sinpe_ref = $data['sinpe_ref'] ?? null;
         } else {
-            $appointment->barber_amount = 0;
-            $appointment->owner_amount = 0;
-            $appointment->payment_method = null;
-            $appointment->tip = 0;
-            $appointment->completed_at = null;
+            $this->dropProof($appointment, $proofs);   // si cambió de SINPE a otro método
         }
-
-        $appointment->status = $data['status'];
-        $appointment->save();
-
-        return back()->with('ok', 'Estado actualizado.');
+    } else {
+        $appointment->barber_amount  = 0;
+        $appointment->owner_amount   = 0;
+        $appointment->payment_method = null;
+        $appointment->tip            = 0;
+        $appointment->completed_at   = null;
+        $this->dropProof($appointment, $proofs);
     }
 
-    /**
-    /** Horas de inicio libres según la duración del servicio: normales, más temprano y más tarde */
+    $appointment->status = $data['status'];
+    $appointment->save();
+
+    $name   = "{$appointment->client_name} {$appointment->client_last_name}";
+    $method = ['efectivo' => 'efectivo', 'sinpe' => 'SINPE', 'tarjeta' => 'tarjeta'][$appointment->payment_method] ?? '';
+    $paid   = '₡' . number_format($appointment->price + $appointment->tip, 0, ',', '.');
+
+    $msg = match ($data['status']) {
+        'completada' => "Cobro registrado: {$name} pagó {$paid} por {$method}"
+            . ($appointment->tip ? ' (incluye ₡' . number_format($appointment->tip, 0, ',', '.') . ' de propina)' : '') . '.',
+        'cancelada'  => "La cita de {$name} fue cancelada.",
+        'no_asistio' => "Marcada como «no vino»: {$name}.",
+        default      => "La cita de {$name} volvió a quedar pendiente.",
+    };
+
+    $redirect = back()->with('ok', $msg);
+
+    if ($data['status'] === 'completada' && $appointment->payment_method === 'sinpe' && ! $appointment->proof_path) {
+        $redirect->with('warn', "Falta el comprobante SINPE de {$name}. Puedes adjuntarlo tocando la cita.");
+    }
+
+    return $redirect;
+}
+
+private function dropProof(Appointment $appointment, ProofStore $proofs): void
+{
+    $proofs->delete($appointment->proof_path);
+    $appointment->proof_path = null;
+    $appointment->sinpe_ref  = null;
+}
+
+    
+    /** Horas de inicio libres según la duración del servicio: normales, más temprano y más tarde **/
 public function availableSlots(Request $request)
 {
     $data = $request->validate([

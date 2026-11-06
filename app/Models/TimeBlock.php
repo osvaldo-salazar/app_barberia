@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\Audited;
 
 class TimeBlock extends Model
 {
+    use Audited;
     protected $guarded = [];
 
     protected $casts = [
@@ -26,4 +28,11 @@ class TimeBlock extends Model
     {
         return $query->where(fn ($w) => $w->whereNull('barber_id')->orWhere('barber_id', $barberId));
     }
+
+    public function auditEntity(): string { return 'bloqueo de horario'; }
+public function auditName(): string
+{
+    return ($this->reason ?: 'Bloqueo') . ' · ' . ($this->barber?->name ?? 'toda la barbería') . ' · '
+        . $this->starts_at->translatedFormat('D j M, g:i A');
+}
 }

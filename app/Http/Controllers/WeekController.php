@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\{Appointment, Expense, WeekPayout};
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\ActivityLog;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -17,6 +18,7 @@ class WeekController extends Controller
     public function pdf(Request $request)
     {
         $d = $this->data($this->ref($request));
+        ActivityLog::note('Descargó el PDF de la semana del ' . $d['start']->format('d/m/Y'), 'export');
 
         return Pdf::loadView('pdf.week', ['d' => $d])->setPaper('a4')
             ->download('semana-' . $d['start']->toDateString() . '.pdf');
@@ -27,8 +29,9 @@ class WeekController extends Controller
     {
         $d    = $this->data($this->ref($request));
         $name = 'semana-' . $d['start']->toDateString() . '.csv';
-
-        return response()->streamDownload(function () use ($d) {
+    ActivityLog::note('Descargó el Excel de la semana del ' . $d['start']->format('d/m/Y'), 'export');
+    
+    return response()->streamDownload(function () use ($d) {
             $out  = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // para que Excel lea bien las tildes
 
@@ -45,6 +48,34 @@ class WeekController extends Controller
                 $p = $b['payout'];
                 $put([$b['name'], $b['cuts'], $b['total'], $b['commission'], $b['tips'], $b['to_pay'],
                       $p ? 'Pagado (' . $p->method . ') el ' . $p->paid_on->format('d/m/Y') : 'Pendiente']);
+            }
+            $put([]);
+
+            $put(['Detalle por barbero']);
+            $put(['Barbero', 'Día', 'Servicio', 'Cantidad', 'Comisión']);
+            foreach ($d['barbers'] as $b) {
+                foreach ($b['days'] as $day) {
+                    foreach ($day['services'] as $x) {
+                        $put([$b['name'], $day['date']->format('d/m/Y'), $x['name'], $x['count'], $x['commission']]);
+                    }
+                    $put([$b['name'], $day['date']->format('d/m/Y'), 'GANÓ EL DÍA (comisión + propinas)', $day['cuts'], $day['earn']]);
+                }
+                $put([$b['name'], 'TOTAL SEMANA', '', $b['cuts'], $b['to_pay']]);
+            }
+            $put([]);
+
+            $put(['SINPE de la semana']);
+            $put(['Fecha', 'Hora', 'Cliente', 'Barbero', 'Monto con propina', 'Referencia', 'Comprobante']);
+            foreach ($d['sinpe'] as $a) {
+                $put([
+    $a->starts_at->format('d/m/Y'),
+    $a->starts_at->format('g:i A'),
+    $a->client_name . ' ' . $a->client_last_name,
+    $a->barber?->name ?? 'Barbero no disponible',
+    $a->price + $a->tip,
+    $a->sinpe_ref,
+    $a->proof_path ? 'Sí' : 'No'
+]);
             }
             $put([]);
 
@@ -149,23 +180,13 @@ class WeekController extends Controller
 
         $payouts = WeekPayout::where('week_start', $start->toDateString())->get()->keyBy('barber_id');
 
-        $barbers = $done->groupBy('barber_id')->map(function ($g, $id) use ($payouts) {
-            $toPay = (int) $g->sum('barber_amount') + (int) $g->sum('tip');
-            $p     = $payouts->get($id);
+        $barbers = app(\App\Services\BarberBreakdown::class)->forRange($start, $end)->map(function ($b) use ($payouts) {
+    $p            = $payouts->get($b['id']);
+    $b['payout']  = $p;
+    $b['changed'] = $p && (int) $p->amount !== $b['to_pay'];
 
-            return [
-                'id'         => (int) $id,
-                'name'       => $g->first()->barber->name,
-                'cuts'       => $g->count(),
-                'total'      => (int) $g->sum('price'),
-                'commission' => (int) $g->sum('barber_amount'),
-                'tips'       => (int) $g->sum('tip'),
-                'owner'      => (int) $g->sum('owner_amount'),
-                'to_pay'     => $toPay,
-                'payout'     => $p,
-                'changed'    => $p && (int) $p->amount !== $toPay,
-            ];
-        })->sortByDesc('total')->values();
+    return $b;
+});
 
         $byMethod = [];
         foreach (['efectivo', 'sinpe', 'tarjeta'] as $m) {
@@ -173,9 +194,11 @@ class WeekController extends Controller
             $byMethod[$m] = ['count' => $g->count(), 'amount' => (int) ($g->sum('price') + $g->sum('tip'))];
         }
 
-        $byService = $done->groupBy('service_id')->map(fn ($g) => [
-            'name' => $g->first()->service->name, 'count' => $g->count(), 'amount' => (int) $g->sum('price'),
-        ])->sortByDesc('count')->values();
+       $byService = $done->groupBy('service_id')->map(fn ($g) => [
+    'name' => $g->first()->service?->name ?? 'Servicio no disponible',
+    'count' => $g->count(),
+    'amount' => (int) $g->sum('price'),
+])->sortByDesc('count')->values();
 
         $days = collect(range(0, 6))->map(function ($i) use ($start, $done) {
             $day = $start->copy()->addDays($i);
@@ -188,27 +211,34 @@ class WeekController extends Controller
             ->orderBy('date')->get();
         $expTotal = (int) $expenses->sum('amount');
         $owner    = (int) $done->sum('owner_amount');
+return [
+    'start'     => $start,
+    'end'       => $end,
+    'payAt'     => $payAt,
+    'barbers'   => $barbers,
+    'days'      => $days,
+    'byMethod'  => $byMethod,
+    'byService' => $byService,
+    'expenses'  => $expenses,
+    'expTotal'  => $expTotal,
+    'profit'   => $owner - $expTotal,
 
-        return [
-            'start'     => $start,
-            'end'       => $end,
-            'payAt'     => $payAt,
-            'barbers'   => $barbers,
-            'days'      => $days,
-            'byMethod'  => $byMethod,
-            'byService' => $byService,
-            'expenses'  => $expenses,
-            'expTotal'  => $expTotal,
-            'profit'    => $owner - $expTotal,
-            'totals'    => [
-                'cuts'       => $done->count(),
-                'total'      => (int) $done->sum('price'),
-                'commission' => (int) $done->sum('barber_amount'),
-                'tips'       => (int) $done->sum('tip'),
-                'owner'      => $owner,
-            ],
-            'unclosed'  => Appointment::where('status', 'pendiente')
-                ->whereBetween('starts_at', [$start, $end])->where('starts_at', '<', now())->count(),
-        ];
+    'sinpe' => $done->where('payment_method', 'sinpe')
+        ->sortBy('starts_at')
+        ->values(),
+
+    'totals' => [
+        'cuts'       => $done->count(),
+        'total'      => (int) $done->sum('price'),
+        'commission' => (int) $done->sum('barber_amount'),
+        'tips'       => (int) $done->sum('tip'),
+        'owner'      => $owner,
+    ],
+
+    'unclosed' => Appointment::where('status', 'pendiente')
+        ->whereBetween('starts_at', [$start, $end])
+        ->where('starts_at', '<', now())
+        ->count(),
+];
     }
 }   

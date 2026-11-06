@@ -6,7 +6,6 @@
   <h1 class="h4 mb-3">Bloqueos de horario</h1>
 
   @if(session('ok'))   <div class="alert alert-success">{{ session('ok') }}</div> @endif
-  @if(session('warn')) <div class="alert alert-warning">{{ session('warn') }}</div> @endif
   @if($errors->any())
     <div class="alert alert-danger py-2">
       <ul class="mb-0 ps-3">@foreach($errors->all() as $msg) <li>{{ $msg }}</li> @endforeach</ul>
@@ -88,7 +87,7 @@
         </div>
       </div>
       <form method="POST" action="{{ route('bloqueos.destroy', $b) }}"
-            onsubmit="return confirm('¿Eliminar este bloqueo?')">
+            data-confirm="¿Eliminar este bloqueo?">
         @csrf @method('DELETE')
         <button class="btn btn-sm btn-outline-danger" aria-label="Eliminar bloqueo"><i class="bi bi-trash3"></i></button>
       </form>

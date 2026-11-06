@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
-
+use App\Models\ActivityLog;
 class LoginController extends Controller
 {
     /*
@@ -42,4 +42,17 @@ class LoginController extends Controller
     {
         return array_merge($request->only($this->username(), 'password'), ['active' => 1]);
     }
+
+    protected $maxAttempts = 5;
+    protected $decayMinutes = 10;
+
+protected function authenticated(Request $request, $user)
+{
+    $user->forceFill([
+        'last_login_at' => now(),
+        'last_login_ip' => $request->ip()
+    ])->save();
+
+    ActivityLog::note('Inició sesión', 'login', null, $user);
+}
 }

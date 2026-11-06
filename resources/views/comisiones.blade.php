@@ -55,7 +55,13 @@
                 @forelse($rows as $r)
                     <tr>
                         <td>
-                            {{ $r->barber->name ?? 'Barbero eliminado' }}
+                            <a href="#"
+                               class="fw-bold text-decoration-none"
+                               data-bs-toggle="modal"
+                               data-bs-target="#bd-{{ $r->barber_id }}">
+                                {{ $r->barber->name }}
+                                <i class="bi bi-box-arrow-up-right small"></i>
+                            </a>
                         </td>
 
                         <td class="text-end">
@@ -118,6 +124,10 @@
         </table>
     </div>
 
+    <p class="small text-muted">
+        Toca el nombre para ver los servicios que se hicieron día por día.
+    </p>
+
     {{-- Métodos de pago: solamente administrador --}}
     @if($isAdmin)
         <h6 class="mt-4 mb-2">Ingresos por método de pago</h6>
@@ -150,4 +160,13 @@
     @endif
 
 </div>
+
+{{-- Detalle de servicios por barbero --}}
+@foreach($details as $b)
+    @include('partials.barber-modal', [
+        'b' => $b,
+        'subtitle' => 'Semana del ' . $start->format('d/m') . ' al ' . $end->format('d/m/Y')
+    ])
+@endforeach
+
 @endsection

@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\Audited;
+
 
 class Client extends Model
 {
+    use Audited;
     public const NAME_REGEX  = '/^[\pL\pM][\pL\pM\s.\'-]*$/u'; // solo letras, espacios, punto, apóstrofe y guion
     public const PHONE_REGEX = '/^[2-8]\d{7}$/';                // 8 dígitos de Costa Rica
 

@@ -35,6 +35,13 @@ return [
     'required_if' => 'El campo :attribute es obligatorio en este caso.',
     'string'      => 'El campo :attribute debe ser texto.',
     'unique'      => 'Ese valor de :attribute ya está en uso.',
+    'password' => [
+    'letters'       => 'La clave debe tener al menos una letra.',
+    'mixed'         => 'La clave debe tener mayúsculas y minúsculas.',
+    'numbers'       => 'La clave debe tener al menos un número.',
+    'symbols'       => 'La clave debe tener al menos un símbolo.',
+    'uncompromised' => 'Esa clave apareció en filtraciones de datos. Elige otra.',
+],
 
     'custom' => [],
 
@@ -74,5 +81,7 @@ return [
         'mes'          => 'mes',
         'fecha'        => 'fecha',
         'semanas'      => 'semanas',
+        'password_confirmation' => 'confirmación de la clave',
+        'weekly_goal' => 'meta semanal',
     ],
 ];

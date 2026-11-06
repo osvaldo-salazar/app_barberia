@@ -29,14 +29,7 @@ class CashBook
             'amount' => (int) $g->sum('price'),
         ])->sortByDesc('count')->values();
 
-        $byBarber = $done->groupBy('barber_id')->map(fn ($g) => [
-            'name'   => $g->first()->barber->name,
-            'cuts'   => $g->count(),
-            'total'  => (int) $g->sum('price'),
-            'barber' => (int) $g->sum('barber_amount'),
-            'tips'   => (int) $g->sum('tip'),
-            'owner'  => (int) $g->sum('owner_amount'),
-        ])->sortByDesc('total')->values();
+      $byBarber = app(BarberBreakdown::class)->forRange($date, $date);
 
         $others = Appointment::whereDate('starts_at', $date)
             ->whereIn('status', ['pendiente', 'no_asistio', 'cancelada'])
@@ -52,6 +45,7 @@ class CashBook
             'pending'   => (int) ($others['pendiente'] ?? 0),
             'noshow'    => (int) ($others['no_asistio'] ?? 0),
             'canceled'  => (int) ($others['cancelada'] ?? 0),
+            'sinpe'     => $done->where('payment_method', 'sinpe')->sortBy('starts_at')->values(),
         ];
     }
 

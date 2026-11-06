@@ -27,6 +27,13 @@
       <div class="form-text">El resto es para el jefe. Solo aplica a citas nuevas.</div>
     </div>
 
+    <div class="mb-3">
+  <label class="form-label">Meta semanal de cortes (opcional)</label>
+  <input name="weekly_goal" type="number" min="1" max="500" class="form-control"
+         value="{{ old('weekly_goal', $barber->weekly_goal) }}" placeholder="Ej: 25">
+  <div class="form-text">Aparece como barra de progreso en la agenda (semana de domingo a sábado).</div>
+</div>
+
     <button class="btn btn-dark">Guardar</button>
     <a href="{{ route('barberos.index') }}" class="btn btn-outline-secondary">Cancelar</a>
   </form>

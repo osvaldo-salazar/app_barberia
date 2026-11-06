@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Configuración de proxies
         $middleware->trustProxies(at: '*');
+        $middleware->web(append: [\App\Http\Middleware\SecurityHeaders::class]);
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {

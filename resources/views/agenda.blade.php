@@ -89,6 +89,28 @@
     @endif
   </div>
 
+  @if($goals->isNotEmpty())
+  <div class="goal-card mb-3">
+    <div class="small text-muted mb-2"><i class="bi bi-bullseye me-1"></i>Meta de la semana (domingo a sábado)</div>
+    @foreach($goals as $g)
+      @php $pct = min(100, (int) round($g['done'] / $g['goal'] * 100)); $hit = $g['done'] >= $g['goal']; @endphp
+      <div class="mb-2">
+        <div class="d-flex justify-content-between small gap-2">
+          <span class="fw-bold">{{ $g['name'] }}</span>
+          <span>
+            {{ $g['done'] }} de {{ $g['goal'] }} cortes ·
+            @if($hit) <span class="text-success fw-bold">¡Meta cumplida!</span>
+            @else faltan {{ $g['goal'] - $g['done'] }} @endif
+          </span>
+        </div>
+        <div class="progress" role="progressbar" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100" style="height:.6rem">
+          <div class="progress-bar {{ $hit ? 'bg-success' : '' }}" style="width: {{ $pct }}%"></div>
+        </div>
+      </div>
+    @endforeach
+  </div>
+@endif
+
   {{-- Aviso de citas fuera del horario normal --}}
   @if($outside->isNotEmpty())
     <button type="button" class="btn btn-sm btn-outline-dark mb-2" id="btnOutside"
@@ -360,6 +382,27 @@
       <div id="sheetNotesRow" hidden><i class="bi bi-journal-text"></i><span id="sheetNotes"></span></div>
     </div>
 
+   <div id="proofRow" class="mb-3" hidden>
+      <div class="small text-muted mb-1"><i class="bi bi-image me-1"></i>Comprobante SINPE <span id="proofRef"></span></div>
+      <img id="proofThumb" class="proof-thumb d-block mb-2" alt="Comprobante SINPE" role="button" tabindex="0" title="Toca para verlo grande" hidden>
+
+      <form method="POST" id="fProof" enctype="multipart/form-data" class="mt-1" hidden>
+        @csrf
+        <input type="file" name="proof" id="proofLate" class="form-control form-control-sm mb-2" accept="image/*" required>
+        <div class="proof-wrap mb-2" id="proofLateWrap" hidden>
+          <img id="proofLatePreview" class="proof-preview" alt="Vista previa" role="button" tabindex="0" title="Toca para verla grande">
+          <button type="button" class="proof-x" id="proofLateX" aria-label="Quitar foto"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <input name="sinpe_ref" class="form-control form-control-sm mb-2" maxlength="30" placeholder="Referencia (opcional)">
+        <button class="btn btn-sm btn-dark">Guardar comprobante</button>
+      </form>
+
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-dark" id="btnProofAdd"></button>
+        <button type="button" class="btn btn-sm btn-outline-danger" id="btnProofDel" hidden>Quitar</button>
+      </div>
+    </div>
+
     <div class="sheet-actions" id="viewPending" hidden>
       <button type="button" class="btn btn-success full" id="btnCharge"><i class="bi bi-cash-coin me-1"></i>Cobrar</button>
       <a class="btn btn-outline-dark" id="btnEdit"><i class="bi bi-pencil me-1"></i>Editar</a>
@@ -372,8 +415,7 @@
       <button type="button" class="btn btn-outline-dark full" id="btnReopen"><i class="bi bi-arrow-counterclockwise me-1"></i>Reabrir cita</button>
     </div>
 
-    <form method="POST" id="fPay" hidden>
-      @csrf @method('PATCH')
+<form method="POST" id="fPay" enctype="multipart/form-data" hidden>      @csrf @method('PATCH')
       <input type="hidden" name="status" value="completada">
       <p class="fw-bold mb-2">Total: <span id="payTotal"></span></p>
 
@@ -385,6 +427,19 @@
         <input type="radio" class="btn-check" name="payment_method" id="pmT" value="tarjeta">
         <label class="btn btn-outline-dark" for="pmT"><i class="bi bi-credit-card me-1"></i>Tarjeta</label>
       </div>
+
+      <div id="sinpeBox" class="mb-3" hidden>
+  <label class="form-label">Comprobante SINPE {{ config('barberia.require_sinpe_proof') ? '' : '(recomendado)' }}</label>
+  <input type="file" name="proof" id="proofPay" class="form-control" accept="image/*">
+
+  <div class="proof-wrap mt-2" id="proofPayWrap" hidden>
+    <img id="proofPayPreview" class="proof-preview" alt="Vista previa del comprobante" role="button" tabindex="0" title="Toca para verla grande">
+    <button type="button" class="proof-x" id="proofPayX" aria-label="Quitar foto"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="form-text">Toca la foto para verla grande. Con la X la quitas si te equivocaste.</div>
+
+  <input name="sinpe_ref" class="form-control mt-2" maxlength="30" placeholder="Número de referencia (opcional)" autocomplete="off">
+</div>
 
       <label class="form-label">Propina (opcional)</label>
       <div class="input-group mb-3">
@@ -479,33 +534,148 @@ document.addEventListener('DOMContentLoaded', () => {
     $('fPay').hidden = true;
     $('fPay').reset();
     $('btnEdit').href = cur.urlEdit;
+
+    clearPay();
+$('sinpeBox').hidden = true;
+
+const isSinpe = cur.status === 'completada' && cur.pay === 'sinpe' && money;
+$('proofRow').hidden = !isSinpe;
+clearLate();
+if (isSinpe) {
+  const has = !!cur.proofUrl;
+  $('proofRef').textContent = cur.ref ? '· Ref. ' + cur.ref : '';
+  $('proofThumb').hidden = !has;
+  if (has) $('proofThumb').src = cur.proofUrl; else $('proofThumb').removeAttribute('src');
+  $('fProof').reset();
+  $('fProof').hidden = true;
+  $('fProof').action = cur.proofStore;
+  $('btnProofAdd').textContent = has ? 'Reemplazar' : 'Adjuntar comprobante';
+  $('btnProofAdd').hidden = false;
+  $('btnProofDel').hidden = !has;
+}
   }
 
-  function setStatus(status, ask) {
-    if (ask && !confirm(ask)) return;
-    const f = $('fStatus');
-    f.action = cur.urlStatus;
-    f.elements.status.value = status;
-    f.submit();
-  }
+ function setStatus(status) {
+  const f = $('fStatus');
+  f.action = cur.urlStatus;
+  f.elements.status.value = status;
+  f.submit();
+}
 
-  $('btnNoShow').onclick = () => setStatus('no_asistio');
-  $('btnCancel').onclick = () => setStatus('cancelada', '¿Cancelar esta cita?');
-  $('btnReopen').onclick = () => setStatus('pendiente',
-    '¿Reabrir la cita?' + (cur.status === 'completada' ? ' Se borrará el pago registrado.' : ''));
-  $('btnDelete').onclick = () => {
-    if (!confirm('¿Eliminar esta cita?')) return;
+// El panel se esconde mientras confirmas y vuelve si cancelas
+async function ask(opts) {
+  sheet.hide();
+  const ok = await bbUi.confirm(opts);
+  if (!ok) sheet.show();
+  return ok;
+}
+
+$('btnNoShow').onclick = async () => {
+  if (await ask({ title: '¿Marcar como «no vino»?', text: cur.name + ' no se presentó a su cita.', ok: 'Sí, no vino' })) setStatus('no_asistio');
+};
+$('btnCancel').onclick = async () => {
+  if (await ask({ title: '¿Cancelar la cita?', text: 'La cita de ' + cur.name + ' quedará cancelada.', ok: 'Sí, cancelar', danger: true })) setStatus('cancelada');
+};
+$('btnReopen').onclick = async () => {
+  const paid = cur.status === 'completada';
+  if (await ask({
+    title: '¿Reabrir la cita?',
+    text: paid ? 'Se borrará el cobro registrado y su comprobante.' : 'Volverá a quedar pendiente.',
+    ok: 'Sí, reabrir', danger: paid,
+  })) setStatus('pendiente');
+};
+$('btnDelete').onclick = async () => {
+  if (await ask({ title: '¿Eliminar la cita?', text: 'Se borra la cita de ' + cur.name + '. No se puede deshacer.', ok: 'Sí, eliminar', danger: true })) {
     const f = $('fDelete');
     f.action = cur.urlDelete;
     f.submit();
-  };
-  $('btnCharge').onclick = () => {
-    $('fPay').action = cur.urlStatus;
-    $('payTotal').textContent = fmt(cur.price);
-    $('viewPending').hidden = true;
-    $('fPay').hidden = false;
+  }
+};
+$('btnCharge').onclick = () => {
+  $('fPay').action = cur.urlStatus;
+  $('payTotal').textContent = fmt(cur.price);
+  $('viewPending').hidden = true;
+  $('fPay').hidden = false;
+};
+
+/* ----- Comprobante SINPE ----- */
+/* ----- Comprobante SINPE ----- */
+
+// Abre la foto grande; el panel se esconde y vuelve al cerrar
+function zoom(src, caption) {
+  sheet.hide();
+  bbUi.lightbox(src, caption).then(() => sheet.show());
+}
+
+function wireProof(input, wrap, img, xBtn) {
+  let url = null;
+
+  const clear = () => {
+    input.value = '';
+    if (url) URL.revokeObjectURL(url);
+    url = null;
+    img.removeAttribute('src');
+    wrap.hidden = true;
   };
 
+  input.addEventListener('change', async () => {
+    const f = input.files[0];
+    if (!f) return clear();
+
+    const small = await bbUi.shrinkImage(f);          // se reduce en el celular antes de subir
+    if (small !== f) {
+      const dt = new DataTransfer();
+      dt.items.add(small);
+      input.files = dt.files;
+    }
+    if (url) URL.revokeObjectURL(url);
+    url = URL.createObjectURL(input.files[0]);
+    img.src = url;
+    wrap.hidden = false;
+  });
+
+  xBtn.addEventListener('click', clear);
+
+  const open = () => url && zoom(url, 'Vista previa del comprobante');
+  img.addEventListener('click', open);
+  img.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+
+  return clear;
+}
+
+const clearPay  = wireProof($('proofPay'),  $('proofPayWrap'),  $('proofPayPreview'),  $('proofPayX'));
+const clearLate = wireProof($('proofLate'), $('proofLateWrap'), $('proofLatePreview'), $('proofLateX'));
+
+// Si cambias a otro método de pago, la foto se quita sola
+document.querySelectorAll('#fPay [name=payment_method]').forEach(r =>
+  r.addEventListener('change', () => {
+    $('sinpeBox').hidden = !$('pmS').checked;
+    if (!$('pmS').checked) clearPay();
+  }));
+
+// Foto ya guardada: verla grande
+const openSaved = () => zoom(cur.proofUrl, 'Comprobante de ' + cur.name);
+$('proofThumb').addEventListener('click', openSaved);
+$('proofThumb').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSaved(); } });
+
+$('btnProofAdd').onclick = () => {
+  $('fProof').hidden = false;
+  $('btnProofAdd').hidden = true;
+  $('btnProofDel').hidden = true;
+};
+
+// Foto ya guardada: quitarla
+$('btnProofDel').onclick = async () => {
+  if (await ask({
+    title: '¿Quitar el comprobante?',
+    text: 'Se borra la foto de ' + cur.name + '. Podrás subir otra después.',
+    ok: 'Sí, quitar', danger: true,
+  })) {
+    const f = $('fDelete');
+    f.action = cur.proofDelete;
+    f.submit();
+  }
+};
   /* =============== Nueva cita =============== */
   const modalEl = $('modalNueva');
   const modal   = bootstrap.Modal.getOrCreateInstance(modalEl);

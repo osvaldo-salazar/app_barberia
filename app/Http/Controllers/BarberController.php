@@ -52,6 +52,7 @@ class BarberController extends Controller
         return $request->validate([
             'name'               => 'required|string|max:60',
             'commission_percent' => 'required|numeric|min:0|max:100',
+            'weekly_goal' => 'nullable|integer|min:1|max:500',
         ], [
             'commission_percent.max' => 'El porcentaje no puede pasar de 100.',
         ]);
