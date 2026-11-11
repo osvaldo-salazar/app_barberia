@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+.env.demo
+
+/respaldo.bat
+/iniciar-barberia.bat
