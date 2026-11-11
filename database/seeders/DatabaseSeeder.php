@@ -6,6 +6,7 @@ use App\Models\{Barber, Service, User};
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,16 +17,32 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $adminName = trim((string) config('admin.name'));
+        $adminEmail = trim((string) config('admin.email'));
+        $adminPassword = (string) config('admin.password');
+
+        if ($adminName === '' || $adminEmail === '' || $adminPassword === '') {
+            throw new RuntimeException(
+                'Configura ADMIN_NAME, ADMIN_EMAIL y ADMIN_PASSWORD en el archivo .env antes de ejecutar los seeders.'
+            );
+        }
+
+        if (! filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException(
+                'ADMIN_EMAIL no contiene una direccion de correo valida.'
+            );
+        }
+
         User::firstOrCreate(
-            ['email' => config('admin.email')],
+            ['email' => $adminEmail],
             [
-                'name' => config('admin.name'),
-                'password' => Hash::make(config('admin.password')),
+                'name' => $adminName,
+                'password' => Hash::make($adminPassword),
                 'role' => 'admin',
             ]
         );
 
-        // Ajusta nombres y porcentajes a tu realidad
+        // Ajusta nombres y porcentajes a tu realidad.
         Barber::create([
             'name' => 'Tu nombre',
             'commission_percent' => 50,
@@ -36,7 +53,7 @@ class DatabaseSeeder extends Seeder
             'commission_percent' => 50,
         ]);
 
-        // Ajusta los precios
+        // Ajusta los precios a tu realidad.
         Service::create([
             'name' => 'Corte',
             'price' => 5000,
